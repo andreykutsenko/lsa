@@ -1,0 +1,144 @@
+# External Signals Rules for LSA
+# These patterns detect external system / configuration failures in trace logs.
+#
+# Rule format:
+#   id: Unique identifier (used in hypotheses)
+#   severity: F (Fatal), E (Error), W (Warning), I (Info)
+#   category: CONFIG, EXTERNAL_API, DATABASE, NETWORK, AUTH, RESOURCE
+#   patterns: List of regex patterns (Python re syntax)
+#             Named groups (?P<name>...) become captures
+#   hints: Human-readable hints for diagnosis
+#   hypothesis_template: Optional template for hypothesis text (uses {capture_name})
+
+rules:
+  # InfoTrac / Message Manager related
+  - id: INFOTRAC_MISSING_MESSAGE_ID
+    severity: F
+    category: CONFIG
+    patterns:
+      - "No data found from message_id:\\s*(?P<message_id>\\d+)\\s*in infotrac db"
+      - "message_id\\s*(?P<message_id>\\d+)\\s*not found in infotrac"
+    hints:
+      - "Message Manager / InfoTrac mapping missing for this message_id."
+      - "This is often a configuration issue, not a Papyrus resource problem."
+      - "Check if message_id is mapped for the requested service (estmt/paper/print)."
+    hypothesis_template: "Message ID {message_id} not found in InfoTrac DB. Likely configuration/Message Manager mapping issue (not Papyrus resource)."
+
+  # Generic API success=false
+  - id: API_SUCCESS_FALSE_JSON
+    severity: E
+    category: EXTERNAL_API
+    patterns:
+      - "\"success\"\\s*:\\s*false"
+      - "'success'\\s*:\\s*False"
+    hints:
+      - "External API returned success=false."
+      - "Check API payload, configuration, or upstream service health."
+
+  # API error message extraction
+  - id: API_ERROR_MESSAGE_JSON
+    severity: E
+    category: EXTERNAL_API
+    patterns:
+      - "\"message\"\\s*:\\s*\"(?P<api_message>[^\"]{5,300})\""
+      - "\"error\"\\s*:\\s*\"(?P<api_message>[^\"]{5,300})\""
+      - "\"errorMessage\"\\s*:\\s*\"(?P<api_message>[^\"]{5,300})\""
+    hints:
+      - "API returned an error message. Review the message for root cause."
+
+  # HTTP errors
+  - id: HTTP_ERROR_STATUS
+    severity: E
+    category: EXTERNAL_API
+    patterns:
+      - "HTTP[/\\s]\\d\\.\\d\\s+(?P<status_code>4\\d{2}|5\\d{2})"
+      - "status[_\\s]*code[\"':\\s]*(?P<status_code>4\\d{2}|5\\d{2})"
+      - "response\\s+code[:\\s]*(?P<status_code>4\\d{2}|5\\d{2})"
+    hints:
+      - "HTTP error status code detected (4xx client error or 5xx server error)."
+      - "Check network connectivity, authentication, and endpoint configuration."
+
+  # Connection failures
+  - id: CONNECTION_REFUSED
+    severity: F
+    category: NETWORK
+    patterns:
+      - "Connection refused"
+      - "connect\\s+ECONNREFUSED"
+      - "Failed to connect to (?P<host>[\\w\\.-]+)"
+    hints:
+      - "Network connection was refused. Service may be down or unreachable."
+      - "Check if target service is running and firewall rules allow connection."
+
+  - id: CONNECTION_TIMEOUT
+    severity: E
+    category: NETWORK
+    patterns:
+      - "connection timed? ?out"
+      - "connect\\s+ETIMEDOUT"
+      - "read timed? ?out"
+    hints:
+      - "Network connection or read timed out."
+      - "Check network latency, service responsiveness, and timeout settings."
+
+  # Database connection issues (non-Oracle)
+  - id: DB_CONNECTION_ERROR
+    severity: F
+    category: DATABASE
+    patterns:
+      - "database connection (?:failed|error|refused)"
+      - "unable to connect to (?:database|db)"
+      - "SQLSTATE\\[(?P<sqlstate>[A-Z0-9]+)\\]"
+    hints:
+      - "Database connection error detected."
+      - "Check database server status, credentials, and connection string."
+
+  # Authentication failures
+  - id: AUTH_FAILURE
+    severity: E
+    category: AUTH
+    patterns:
+      - "authentication failed"
+      - "invalid credentials"
+      - "unauthorized"
+      - "401\\s+Unauthorized"
+      - "access denied"
+    hints:
+      - "Authentication or authorization failure detected."
+      - "Check credentials, tokens, and access permissions."
+
+  # Resource/file not found via API
+  - id: RESOURCE_NOT_FOUND_API
+    severity: E
+    category: EXTERNAL_API
+    patterns:
+      - "404\\s+Not Found"
+      - "resource not found"
+      - "endpoint not found"
+    hints:
+      - "Requested resource or endpoint was not found."
+      - "Check URL, resource ID, and API version compatibility."
+
+  # Service-specific patterns
+  - id: SERVICE_UNAVAILABLE
+    severity: F
+    category: EXTERNAL_API
+    patterns:
+      - "503\\s+Service Unavailable"
+      - "service\\s+(?:is\\s+)?unavailable"
+      - "backend\\s+(?:is\\s+)?(?:down|unavailable)"
+    hints:
+      - "Service is temporarily unavailable."
+      - "Check service health, load, and deployment status."
+
+  # SSL/TLS errors
+  - id: SSL_CERTIFICATE_ERROR
+    severity: E
+    category: NETWORK
+    patterns:
+      - "SSL certificate (?:error|problem|verify failed)"
+      - "certificate has expired"
+      - "unable to verify.*certificate"
+    hints:
+      - "SSL/TLS certificate error detected."
+      - "Check certificate validity, trust chain, and expiration date."
