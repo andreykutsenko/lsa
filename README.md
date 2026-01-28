@@ -1,6 +1,6 @@
 # LSA — Legacy Script Archaeologist
 
-Local CLI tool for analyzing legacy RHS/Papyrus script snapshots. Produces execution graphs, matches logs to processes, and generates "context packs" — structured summaries that can be pasted into an IDE or LLM for deeper investigation.
+Local CLI tool for analyzing legacy Papyrus/DocExec script snapshots. Produces execution graphs, matches logs to processes, and generates "context packs" — structured summaries that can be pasted into an IDE or LLM for deeper investigation.
 
 ## Why This Exists
 
@@ -21,8 +21,8 @@ LSA automates this preprocessing step:
 
 ```
 ┌─────────────────┐     ┌──────────────────────────────────────────────────┐
-│  RHS Snapshot   │────▶│  lsa scan  ──▶  SQLite DB (.lsa/lsa.sqlite)     │
-│  (no logs)      │     │                 - artifacts, procs, nodes, edges │
+│    Snapshot     │────▶│  lsa scan  ──▶  SQLite DB (.lsa/lsa.sqlite)     │
+│    (no logs)    │     │                 - artifacts, procs, nodes, edges │
 └─────────────────┘     │                 - FTS index for search           │
                         │                                                  │
 ┌─────────────────┐     │  lsa import-codes  ──▶  message_codes table     │
@@ -45,32 +45,35 @@ LSA automates this preprocessing step:
                         └──────────────────────────────────────────────────┘
 ```
 
+For detailed technical architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Repository Layout
 
 ```
-lsa_project/                    # This repo (Git tracked)
-├── tools/lsa/                  # Python package
+lsa_project/                     # This repo (Git tracked)
+├── tools/lsa/                   # Python package
 │   ├── lsa/
-│   │   ├── cli.py             # Typer CLI entrypoint
-│   │   ├── db/schema.py       # SQLite tables
+│   │   ├── cli.py              # Typer CLI entrypoint
+│   │   ├── db/schema.py        # SQLite tables
 │   │   ├── rules/external_signals.yaml  # Detection rules
 │   │   └── ...
 │   ├── tests/
 │   └── pyproject.toml
 ├── docs/
+│   └── ARCHITECTURE.md         # Technical deep-dive
 └── README.md
 
-rhs_snapshot_project/           # NOT in Git (see .gitignore)
-├── rhs_snapshot_20260127_*/   # Actual snapshots
+snapshot_project/                # NOT in Git (see .gitignore)
+├── snapshot_20260127_*/        # Actual snapshots
 │   ├── procs/
 │   ├── master/
 │   ├── control/
 │   ├── docdef/
-│   └── .lsa/lsa.sqlite        # Per-snapshot DB
+│   └── .lsa/lsa.sqlite         # Per-snapshot DB
 ├── refs/
-│   ├── papyrus/*.pdf          # Message codes PDF
-│   └── histories/             # Shared debugging histories
-└── logs_inbox/                # Drop logs here for analysis
+│   ├── papyrus/*.pdf           # Message codes PDF
+│   └── histories/              # Shared debugging histories
+└── logs_inbox/                 # Drop logs here for analysis
 ```
 
 ## Installation
@@ -79,9 +82,8 @@ rhs_snapshot_project/           # NOT in Git (see .gitignore)
 
 ```bash
 # Clone and enter repo
-cd /mnt/c/Users/<you>/code
-git clone <repo-url> lsa_project
-cd lsa_project
+git clone https://github.com/andreykutsenko/lsa.git
+cd lsa
 
 # Create venv and install
 python3 -m venv .venv
@@ -109,7 +111,7 @@ pytest tools/lsa/tests/
 
 ### Creating a Snapshot (without logs)
 
-Snapshots capture RHS system state at a point in time. **Do not copy logs into the snapshot** — logs are analyzed separately.
+Snapshots capture production system state at a point in time. **Do not copy logs into the snapshot** — logs are analyzed separately.
 
 Recommended helper script (`~/bin/mk_snap_and_scan.sh`):
 
@@ -118,7 +120,7 @@ Recommended helper script (`~/bin/mk_snap_and_scan.sh`):
 # Usage: mk_snap_and_scan.sh <source_host>
 set -e
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SNAP_DIR="/mnt/c/Users/$USER/code/rhs_snapshot_project/rhs_snapshot_${TIMESTAMP}"
+SNAP_DIR="$HOME/snapshots/snapshot_${TIMESTAMP}"
 
 # rsync from source (exclude logs, tmp, etc.)
 rsync -avz --exclude='*.log' --exclude='tmp/' \
@@ -127,7 +129,7 @@ rsync -avz "${1}:/home/procs/" "${SNAP_DIR}/procs/"
 # ... other directories
 
 # Index immediately
-source /mnt/c/Users/$USER/code/lsa_project/.venv/bin/activate
+source "$HOME/lsa/.venv/bin/activate"
 lsa scan "$SNAP_DIR"
 lsa import-codes "$SNAP_DIR"  # Auto-detects PDF
 lsa import-histories "$SNAP_DIR"  # Auto-detects histories dir
@@ -136,7 +138,7 @@ lsa import-histories "$SNAP_DIR"  # Auto-detects histories dir
 ### Typical Usage
 
 ```bash
-SNAP=/mnt/c/Users/akutsenko/code/rhs_snapshot_project/rhs_snapshot_20260127_120000
+SNAP="$HOME/snapshots/snapshot_20260127_120000"
 
 # 1. Scan snapshot (builds graph, indexes files)
 lsa scan "$SNAP"
@@ -186,7 +188,7 @@ lsa explain "$SNAP" --log trace.log --proc bkfnds1  # Force specific proc
 Instead of copying all logs into snapshots, keep logs separate:
 
 ```
-rhs_snapshot_project/
+snapshot_project/
 └── logs_inbox/           # Drop logs here
     ├── issue_20260127_bkfnds1.log
     └── customer_complaint_trace.log
@@ -340,4 +342,4 @@ Internal use only. Not for distribution.
 
 ---
 
-*Generated for LSA v0.1.0 — Legacy Script Archaeologist*
+*LSA v0.1.0 — Legacy Script Archaeologist*

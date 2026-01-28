@@ -18,10 +18,9 @@ build/
 *.log
 logs_inbox/
 
-# Snapshots (large, external to repo)
-rhs_snapshot_*/
-rhs_snapshot_project/
-snapshot/
+# Snapshots (if accidentally placed inside repo)
+.lsa/
+*.sqlite
 
 # IDE / OS
 .DS_Store
