@@ -1,0 +1,38 @@
+# Virtual environments
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# LSA databases (per-snapshot)
+.lsa/
+*.sqlite
+
+# Logs (analyzed separately, not committed)
+*.log
+logs_inbox/
+
+# Snapshots (large, external to repo)
+rhs_snapshot_*/
+rhs_snapshot_project/
+snapshot/
+
+# IDE / OS
+.DS_Store
+*.swp
+.idea/
+*.code-workspace
+.specstory/
+.cursorindexingignore
+.claude/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
