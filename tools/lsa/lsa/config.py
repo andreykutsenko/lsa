@@ -19,10 +19,11 @@ DB_NAME = "lsa.sqlite"
 TEXT_EXTENSIONS = {
     ".procs", ".sh", ".pl", ".py", ".control", ".ins",
     ".txt", ".md", ".cfg", ".conf", ".ini", ".sql",
+    ".dfa", ".DFA",  # docdef files are text and should be searchable
 }
 
 # Extensions that are metadata-only (no text_content)
-METADATA_ONLY_EXTENSIONS = {".dfa", ".afp", ".pdf", ".zip", ".pgp", ".log"}
+METADATA_ONLY_EXTENSIONS = {".afp", ".pdf", ".zip", ".pgp", ".log"}
 
 # Similarity threshold for case_cards matching
 SIMILARITY_THRESHOLD = 0.3
