@@ -1,13 +1,13 @@
 # LSA — Legacy Script Archaeologist
 
-Local CLI tool for analyzing legacy Papyrus/DocExec script snapshots. Produces execution graphs, matches logs to processes, and generates "context packs" — structured summaries that can be pasted into an IDE or LLM for deeper investigation.
+Local CLI tool for analyzing legacy batch system snapshots. Scans script directories, builds execution graphs, matches logs to processes, and generates "context packs" — structured summaries that can be pasted into an IDE or LLM for deeper investigation.
 
 ## Why This Exists
 
-Debugging legacy batch systems (Papyrus, DocExec, shell scripts) typically involves:
+Debugging legacy batch systems typically involves:
 1. Searching through thousands of files for execution paths
-2. Decoding cryptic error codes (PPCS, PPDE, AFPR)
-3. Identifying whether failures are code bugs or external config issues (InfoTrac, Message Manager)
+2. Decoding cryptic error codes with no documentation at hand
+3. Identifying whether failures are code bugs or external config issues
 4. Remembering past solutions for similar problems
 
 LSA automates this preprocessing step:
@@ -26,7 +26,7 @@ LSA automates this preprocessing step:
 └─────────────────┘     │                 - FTS index for search           │
                         │                                                  │
 ┌─────────────────┐     │  lsa import-codes  ──▶  message_codes table     │
-│  PDF (codes KB) │────▶│                         (PPCS, PPDE, AFPR...)    │
+│  PDF (codes KB) │────▶│                         (error/message codes)    │
 └─────────────────┘     │                                                  │
                         │  lsa import-histories ──▶ case_cards table       │
 ┌─────────────────┐────▶│                          (past debugging cases)  │
@@ -65,13 +65,14 @@ lsa_project/                     # This repo (Git tracked)
 
 snapshot_project/                # NOT in Git (see .gitignore)
 ├── snapshot_20260127_*/        # Actual snapshots
-│   ├── procs/
-│   ├── master/
-│   ├── control/
-│   ├── docdef/
-│   └── .lsa/lsa.sqlite         # Per-snapshot DB
+│   ├── procs/                  # Process definitions (.procs)
+│   ├── master/                 # Shell/Perl scripts
+│   ├── control/                # Control/config files
+│   ├── insert/                 # Include/insert files
+│   ├── docdef/                 # Document definitions (DFA)
+│   └── .lsa/lsa.sqlite         # Per-snapshot DB (auto-created)
 ├── refs/
-│   ├── papyrus/*.pdf           # Message codes PDF
+│   ├── *.pdf                   # Message codes PDF (knowledge base)
 │   └── histories/              # Shared debugging histories
 └── logs_inbox/                 # Drop logs here for analysis
 ```
@@ -186,6 +187,15 @@ lsa plan "$SNAP" --cid WCCU --jobid ds1
 
 # By free-text title (extracts CID, letter number, keywords)
 lsa plan "$SNAP" --title "WCCU Letter 14 monthly update"
+
+# Machine-readable JSON output
+lsa plan "$SNAP" --cid WCCU --title "Letter 14" --json
+
+# Ready-to-paste prompt for Cursor/AI IDE
+lsa plan "$SNAP" --cid WCCU --title "Letter 14" --cursor
+
+# Russian output
+lsa plan "$SNAP" --cid WCCU --title "Letter 14" --lang ru
 ```
 
 ### `lsa explain` Options
@@ -242,7 +252,7 @@ lsa explain "$SNAP" --log file.log --no-persist
 
 ### Case Cards (from Histories)
 
-Case cards are extracted from debugging history files (Cursor/SpecStory sessions):
+Case cards are extracted from debugging history files (IDE sessions, Markdown notes):
 
 | Column | Description |
 |--------|-------------|
@@ -257,7 +267,7 @@ During `lsa explain`, similar cases are matched by error signals and shown in th
 
 ## External Signals Detection
 
-LSA detects external configuration issues (not code bugs) using rules in `lsa/rules/external_signals.yaml`:
+LSA detects external configuration issues (not code bugs) using pluggable YAML rules in `lsa/rules/external_signals.yaml`. Rules are easy to extend for any batch system. Built-in detectors:
 
 | Signal ID | Category | Example Pattern |
 |-----------|----------|-----------------|
