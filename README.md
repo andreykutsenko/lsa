@@ -173,6 +173,20 @@ lsa incidents "$SNAP"
 | `lsa import-codes <SNAP> [--pdf PATH]` | Import message codes from PDF |
 | `lsa import-histories <SNAP> [--path DIR] [--glob PATTERN]` | Import case cards |
 | `lsa incidents <SNAP> [--limit N]` | List analyzed incidents |
+| `lsa plan <SNAP> [--cid CID] [--jobid ID] [--title TEXT]` | Plan file bundle for a proc/job |
+
+### `lsa plan` — Plan / Bundle
+
+Find matching proc(s) by CID/job ID or free-text title, collect related files
+(scripts, inserts, controls, DFAs), and output a ranked bundle of files to open.
+
+```bash
+# By CID + job ID (exact match)
+lsa plan "$SNAP" --cid WCCU --jobid ds1
+
+# By free-text title (extracts CID, letter number, keywords)
+lsa plan "$SNAP" --title "WCCU Letter 14 monthly update"
+```
 
 ### `lsa explain` Options
 
