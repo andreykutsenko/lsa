@@ -40,6 +40,7 @@ from .graph.matching import get_related_files, format_debug_candidates, MatchCan
 from .graph.builder import get_graph_stats
 from .analysis import generate_hypotheses, find_similar_cases
 from .analysis.hypotheses import get_default_hypotheses
+from .analysis.planner import generate_plan, format_plan_output, format_plan_json, format_cursor_prompt
 from .output import generate_context_pack
 
 app = typer.Typer(
@@ -865,6 +866,78 @@ def incidents(
         console.print(f"  Node: {node_key} ({conf_str} confidence)")
         console.print(f"  Analyzed: {timestamp}")
         console.print()
+
+
+@app.command()
+def plan(
+    snapshot: Path = typer.Argument(..., help="Path to snapshot directory"),
+    cid: str = typer.Option(None, "--cid", help="Client ID (e.g. WCCU)"),
+    jobid: str = typer.Option(None, "--jobid", help="Job ID (e.g. ds1)"),
+    title: str = typer.Option(None, "--title", "-t", help="Free-text title (e.g. 'WCCU Letter 14 monthly update')"),
+    top: int = typer.Option(5, "--top", "--limit", "-n", help="How many candidates to include"),
+    debug: bool = typer.Option(False, "--debug", "-d", help="Show score breakdown"),
+    show_all: bool = typer.Option(False, "--all", help="Show full details for all candidates"),
+    output_json: bool = typer.Option(False, "--json", help="Print only JSON to stdout"),
+    output_cursor: bool = typer.Option(False, "--cursor", help="Print ready-to-paste Cursor prompt"),
+    lang: str = typer.Option("en", "--lang", help="Output language (en, ru)"),
+):
+    """
+    Plan a file bundle for a proc/job.
+
+    Finds matching proc(s) by CID/job ID or title keywords,
+    collects related files (scripts, inserts, controls, DFAs),
+    and outputs a ranked bundle with files to open.
+
+    Output modes:
+        (default)   Winner details + compact summary of others
+        --all       Full details for every candidate
+        --json      Machine-readable JSON only
+        --cursor    Markdown prompt for Cursor IDE with embedded JSON
+        --lang XX   Output language: en (default), ru
+
+    Examples:
+        lsa plan $SNAP --cid WCCU --jobid ds1
+        lsa plan $SNAP --title "WCCU Letter 14 monthly update"
+        lsa plan $SNAP --cid WCCU --title "Letter 14" --json
+        lsa plan $SNAP --cid WCCU --title "Letter 14" --cursor
+    """
+    snapshot = snapshot.resolve()
+
+    if not snapshot.exists():
+        console.print(f"[red]Error:[/red] Snapshot path does not exist: {snapshot}")
+        raise typer.Exit(1)
+
+    db_path = get_db_path(snapshot)
+    if not db_path.exists():
+        console.print(f"[red]Error:[/red] Database not found. Run 'lsa scan' first.")
+        raise typer.Exit(1)
+
+    if not cid and not jobid and not title:
+        console.print("[red]Error:[/red] Provide at least --cid, --jobid, or --title.")
+        raise typer.Exit(1)
+
+    with get_connection(db_path) as conn:
+        intent, candidates = generate_plan(
+            conn,
+            snapshot_path=snapshot,
+            cid=cid,
+            job_id=jobid,
+            title=title,
+            limit=top,
+            debug=debug,
+        )
+
+    if output_json:
+        from .analysis.planner import format_plan_json
+        data = format_plan_json(intent, candidates, snapshot)
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    elif output_cursor:
+        from .analysis.planner import format_cursor_prompt
+        prompt = format_cursor_prompt(intent, candidates, snapshot, lang=lang)
+        print(prompt)
+    else:
+        output = format_plan_output(intent, candidates, snapshot, debug=debug, show_all=show_all, lang=lang)
+        print(output)
 
 
 if __name__ == "__main__":

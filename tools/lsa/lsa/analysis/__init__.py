@@ -9,6 +9,17 @@ from .external_signals import (
     ExternalSignal,
     ExternalSignalEvidence,
 )
+from .planner import (
+    generate_plan,
+    format_plan_output,
+    format_plan_json,
+    format_cursor_prompt,
+    parse_title,
+    build_intent,
+    PlanIntent,
+    BundleFile,
+    BundleCandidate,
+)
 
 __all__ = [
     "generate_hypotheses",
@@ -18,4 +29,13 @@ __all__ = [
     "get_infotrac_missing_ids",
     "ExternalSignal",
     "ExternalSignalEvidence",
+    "generate_plan",
+    "format_plan_output",
+    "format_plan_json",
+    "format_cursor_prompt",
+    "parse_title",
+    "build_intent",
+    "PlanIntent",
+    "BundleFile",
+    "BundleCandidate",
 ]
