@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-01-30
+**Last Updated:** 2026-02-18
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -137,7 +137,6 @@ Strengthen case_cards as a solutions knowledge base:
 - [ ] Improved case_cards: store full chunk content for better search
 
 ### Other Ideas
-- [ ] `lsa bundle` — copy bundled files to temp dir for quick access
 - [ ] `lsa export` — export context pack to file (for automation)
 - [ ] `lsa plan --lang zh` — add more languages as needed
 - [ ] Web UI (optional, low priority)
@@ -175,6 +174,32 @@ Strengthen case_cards as a solutions knowledge base:
 | Log parser | `tools/lsa/lsa/parsers/log_parser.py` |
 | PDF parser | `tools/lsa/lsa/parsers/pdf_parser.py` |
 | Tests | `tools/lsa/tests/` |
+
+---
+
+## Workflow Scripts
+
+Shell scripts in `scripts/` for day-to-day work with LSA. Paths are configured via env vars — see `scripts/.env.example`.
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/mk_snap_and_scan.sh` | Create RHS snapshot via rsync, then run `lsa scan` + `import-codes` + `import-histories` |
+| `scripts/mk_ticket_ws.sh` | Prepare a per-ticket workspace using `lsa plan --json`: copy relevant files, generate notes |
+
+**Env vars** (add to `~/.bashrc`):
+```bash
+export SNAPROOT="/path/to/rhs_snapshot_project"
+export WORKROOT="/path/to/ticket_workspaces"
+export RHS_HOST="rhs"
+```
+
+**Typical flow:**
+```bash
+mk_snap_and_scan.sh              # 1. fresh snapshot + indexed DB
+mk_ticket_ws.sh SD2-774 \        # 2. workspace for a ticket
+  --snap "$SNAP" --cid WCCU \
+  --title "Letter 14" --ssh-copy
+```
 
 ---
 
