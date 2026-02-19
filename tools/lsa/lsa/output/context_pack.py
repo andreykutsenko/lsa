@@ -1,5 +1,6 @@
 """Context pack generator for LSA."""
 
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -7,6 +8,9 @@ from ..config import MAX_CONTEXT_PACK_LINES, MAX_EVIDENCE_SNIPPET
 from ..parsers.log_parser import LogAnalysis
 from ..analysis.hypotheses import Hypothesis
 from ..analysis.similarity import SimilarCase
+
+# Only formal Papyrus/AFP codes belong in the decoded section
+_FORMAL_CODE_RE = re.compile(r"^(?:PP[A-Z]{2}\d{4}[A-Z]|AFPR\d{4}[A-Z])$", re.IGNORECASE)
 
 
 def generate_context_pack(
@@ -112,12 +116,12 @@ def generate_context_pack(
     lines.append("3b. PAPYRUS/DOCEXEC CODES (decoded)")
     lines.append("-" * 40)
 
-    # Get codes to decode - prefer F/E severity, limit to 10
-    fatal_codes = [c for c in log_analysis.error_codes if c.endswith('F')]
-    error_codes = [c for c in log_analysis.error_codes if c.endswith('E')]
-    other_codes = [c for c in log_analysis.error_codes if not c.endswith('F') and not c.endswith('E')]
-    codes_to_show = fatal_codes + error_codes + other_codes
-    codes_to_show = codes_to_show[:10]
+    # Only show formal Papyrus/AFP codes — custom text signals belong in section 3, not here
+    formal_codes = [c for c in log_analysis.error_codes if _FORMAL_CODE_RE.match(c)]
+    fatal_codes = [c for c in formal_codes if c.upper().endswith('F')]
+    error_codes = [c for c in formal_codes if c.upper().endswith('E')]
+    other_formal = [c for c in formal_codes if not c.upper().endswith('F') and not c.upper().endswith('E')]
+    codes_to_show = (fatal_codes + error_codes + other_formal)[:10]
 
     if codes_to_show:
         for code in codes_to_show:
@@ -270,15 +274,17 @@ def generate_context_pack(
     if log_analysis.error_codes:
         first_code = log_analysis.error_codes[0]
         lines.append(f"# Search for specific error")
-        lines.append(f"grep -n '{first_code}' {log_path}")
+        lines.append(f"grep -ni '{first_code}' {log_path}")
     lines.append("")
 
     # 7. Similar past cases
     lines.append("-" * 40)
     lines.append("7. SIMILAR PAST CASES")
     lines.append("-" * 40)
-    if similar_cases:
-        for case in similar_cases:
+    # Only show chunks that have actual content (root_cause or fix_summary)
+    meaningful_cases = [c for c in similar_cases if c.root_cause or c.fix_summary]
+    if meaningful_cases:
+        for case in meaningful_cases:
             lines.append(f"[{case.title or 'Untitled'}] (match: {case.match_score:.0%})")
             if case.root_cause:
                 cause = case.root_cause
@@ -297,6 +303,9 @@ def generate_context_pack(
                         cmd = cmd[:60] + "..."
                     lines.append(f"    {cmd}")
             lines.append("")
+    elif similar_cases:
+        lines.append("Similar case found but no root cause/fix documented in case card")
+        lines.append(f"  (matched signals: {', '.join(similar_cases[0].matching_signals[:3])})")
     else:
         lines.append("No similar cases found (or below threshold)")
     lines.append("")
