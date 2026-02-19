@@ -185,6 +185,15 @@ def parse_log_file(file_path: Path) -> LogAnalysis:
 
         if signal.code:
             error_codes.add(signal.code)
+
+        # Extract custom error signals for lines with no formal code
+        if signal.severity in ("E", "F") and not signal.code:
+            from . import patterns as pat
+            for err_pat in pat.ERROR_SIGNATURES:
+                m = err_pat.search(line)
+                if m:
+                    error_codes.add(m.group(0).lower())
+
         if signal.docdef_ref:
             docdef_refs.add(signal.docdef_ref)
         if signal.script_ref:
