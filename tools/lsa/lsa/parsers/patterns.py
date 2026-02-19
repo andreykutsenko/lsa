@@ -151,6 +151,29 @@ ERROR_SIGNATURES = [
     # Generic error patterns
     re.compile(r"Failed in \w+", re.IGNORECASE),
     re.compile(r"Error within program", re.IGNORECASE),
+    # XML/data file parse count mismatch
+    re.compile(r"did not parse all XML", re.IGNORECASE),
+    # File access errors
+    re.compile(r"can not open .+ for reading", re.IGNORECASE),
+    re.compile(r"missing file_size", re.IGNORECASE),
+    re.compile(r"error reading the \.zip contents", re.IGNORECASE),
+    # Input file registration errors
+    re.compile(r"was not detected in ISD INCOMING_FILE table", re.IGNORECASE),
+    re.compile(r"No data file in directory for \w+", re.IGNORECASE),
+    re.compile(r"No Paperless file found", re.IGNORECASE),
+    re.compile(r"Error Missing MM3 index portal file", re.IGNORECASE),
+    # isisdisk errors
+    re.compile(r"Error in isisdisk(?:_\w+)?\.sh", re.IGNORECASE),
+    re.compile(r"isisdisk failed for job type", re.IGNORECASE),
+    # PDF/AFP conversion errors
+    re.compile(r"PDF found doesn't match index record counts", re.IGNORECASE),
+    re.compile(r"afp2pdf\.py failed", re.IGNORECASE),
+    re.compile(r"wrong value for start page", re.IGNORECASE),
+    # Plugin/script errors
+    re.compile(r"Failed running plugin \S+", re.IGNORECASE),
+    re.compile(r"Error: function \w+\(\)", re.IGNORECASE),
+    # SQL*Plus errors
+    re.compile(r"SP2-\d{4}:", re.IGNORECASE),
 ]
 
 # Shell command patterns (for verify_commands extraction)
