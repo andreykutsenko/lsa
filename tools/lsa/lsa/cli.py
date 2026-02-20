@@ -350,7 +350,6 @@ def explain(
             context_pack=context_pack,
             log_path=log,
             log_analysis=log_analysis,
-            related_files=related_files,
             lang=lang,
         )
         print(prompt)
