@@ -243,6 +243,30 @@ def parse_chunk_to_case_card(
     return card
 
 
+def _extract_field_from_file(text: str, keywords: tuple[str, ...]) -> str | None:
+    """
+    Extract a field value from full file text by looking for section headers.
+
+    Handles both inline ("## Root cause: text") and block ("## Root cause\\n\\ntext") formats.
+    """
+    kw_pattern = "|".join(re.escape(k) for k in keywords)
+    # Inline: ## Root cause: text on same line
+    m = re.search(
+        rf"##\s*(?:{kw_pattern})[:\s]+(.+?)(?=\n##|\Z)",
+        text, re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        return m.group(1).strip()[:300]
+    # Block: ## Root cause\n\ntext in following paragraphs
+    m = re.search(
+        rf"##\s*(?:{kw_pattern})\s*\n+(.+?)(?=\n##|\Z)",
+        text, re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        return m.group(1).strip()[:300]
+    return None
+
+
 def parse_history_file(
     file_path: Path,
     redact: bool = False,
@@ -273,6 +297,23 @@ def parse_history_file(
         card = parse_chunk_to_case_card(chunk_text, chunk_id, source_path, redact)
         if card:
             cards.append(card)
+
+    # Propagate file-level root_cause / fix_summary to signal-bearing chunks
+    # that didn't get them from their own text (e.g. when content lives in a
+    # separate ## Root cause / ## Fix section that has no signals of its own).
+    signal_cards = [c for c in cards if c.signals]
+    if signal_cards and any(not c.root_cause or not c.fix_summary for c in signal_cards):
+        file_root_cause = _extract_field_from_file(
+            text, ("root cause", "причина", "problem", "причина ошибки")
+        )
+        file_fix_summary = _extract_field_from_file(
+            text, ("fix", "решение", "solution", "исправление")
+        )
+        for card in signal_cards:
+            if not card.root_cause and file_root_cause:
+                card.root_cause = file_root_cause
+            if not card.fix_summary and file_fix_summary:
+                card.fix_summary = file_fix_summary
 
     return cards
 
