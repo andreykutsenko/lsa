@@ -55,9 +55,9 @@ def generate_context_pack(
     lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     lines.append("")
 
-    # 1. Most likely failing node
+    # 1. Process context (merged from old sections 1 and 2)
     lines.append("-" * 40)
-    lines.append("1. MOST LIKELY FAILING NODE")
+    lines.append("1. PROCESS CONTEXT")
     lines.append("-" * 40)
     if top_node:
         lines.append(f"Node: {top_node['display_name']} (confidence: {confidence:.0%})")
@@ -69,10 +69,6 @@ def generate_context_pack(
         lines.append("NOT FOUND - could not determine failing node")
     lines.append("")
 
-    # 2. Execution chain
-    lines.append("-" * 40)
-    lines.append("2. EXECUTION CHAIN")
-    lines.append("-" * 40)
     if neighbors:
         if neighbors["upstream"]:
             lines.append("Upstream (dependencies):")
@@ -93,9 +89,9 @@ def generate_context_pack(
         lines.append("NOT FOUND in snapshot")
     lines.append("")
 
-    # 3. Evidence
+    # 2. Evidence
     lines.append("-" * 40)
-    lines.append("3. EVIDENCE (error log lines)")
+    lines.append("2. EVIDENCE (error log lines)")
     lines.append("-" * 40)
     error_signals = log_analysis.error_signals[:8]
     if error_signals:
@@ -111,8 +107,8 @@ def generate_context_pack(
         lines.append(f"Error codes: {', '.join(log_analysis.error_codes[:10])}")
     lines.append("")
 
-    # 3b. PAPYRUS/DOCEXEC CODES (decoded) — only shown when formal codes are present
-    # Only show formal Papyrus/AFP codes — custom text signals belong in section 3, not here
+    # 2b. PAPYRUS/DOCEXEC CODES (decoded) — only shown when formal codes are present
+    # Only show formal Papyrus/AFP codes — custom text signals belong in section 2, not here
     formal_codes = [c for c in log_analysis.error_codes if _FORMAL_CODE_RE.match(c)]
     fatal_codes = [c for c in formal_codes if c.upper().endswith('F')]
     error_codes = [c for c in formal_codes if c.upper().endswith('E')]
@@ -121,7 +117,7 @@ def generate_context_pack(
 
     if codes_to_show:
         lines.append("-" * 40)
-        lines.append("3b. PAPYRUS/DOCEXEC CODES (decoded)")
+        lines.append("2b. PAPYRUS/DOCEXEC CODES (decoded)")
         lines.append("-" * 40)
         for code in codes_to_show:
             if decoded_codes and code in decoded_codes:
@@ -141,11 +137,11 @@ def generate_context_pack(
                 lines.append(f"{code} - UNKNOWN CODE (not in KB yet)")
         lines.append("")
 
-    # 3c. FILES FROM LOG EVIDENCE — only shown when file references exist
+    # 2c. FILES FROM LOG EVIDENCE — only shown when file references exist
     has_file_refs = log_analysis.docdef_tokens or log_analysis.script_paths or log_analysis.io_paths
     if has_file_refs:
         lines.append("-" * 40)
-        lines.append("3c. FILES FROM LOG EVIDENCE")
+        lines.append("2c. FILES FROM LOG EVIDENCE")
         lines.append("-" * 40)
 
         # DOCDEF tokens
@@ -184,10 +180,10 @@ def generate_context_pack(
 
         lines.append("")
 
-    # 3d. EXTERNAL CONFIG SIGNALS — only shown when external signals exist
+    # 2d. EXTERNAL CONFIG SIGNALS — only shown when external signals exist
     if log_analysis.external_signals:
         lines.append("-" * 40)
-        lines.append("3d. EXTERNAL CONFIG SIGNALS")
+        lines.append("2d. EXTERNAL CONFIG SIGNALS")
         lines.append("-" * 40)
 
         # Sort by severity (F > E > W > I) and show top 5
@@ -231,36 +227,9 @@ def generate_context_pack(
             )
         lines.append("")
 
-    # 4. Hypotheses
+    # 3. Similar past cases (moved from old section 7)
     lines.append("-" * 40)
-    lines.append("4. TOP HYPOTHESES")
-    lines.append("-" * 40)
-    if hypotheses:
-        for i, hyp in enumerate(hypotheses, 1):
-            lines.append(f"{i}. {hyp.hypothesis}")
-            lines.append(f"   Evidence (L{hyp.line_number}): {hyp.evidence}")
-            lines.append("   How to confirm:")
-            for step in hyp.confirm_steps:
-                lines.append(f"   - {step}")
-            lines.append("")
-    else:
-        lines.append("No specific hypotheses - review log for details")
-    lines.append("")
-
-    # 5. Files to open
-    lines.append("-" * 40)
-    lines.append("5. FILES TO OPEN")
-    lines.append("-" * 40)
-    if related_files:
-        for f in related_files[:8]:
-            lines.append(f"  {f}")
-    else:
-        lines.append("NOT FOUND in snapshot")
-    lines.append("")
-
-    # 7. Similar past cases
-    lines.append("-" * 40)
-    lines.append("7. SIMILAR PAST CASES")
+    lines.append("3. SIMILAR PAST CASES")
     lines.append("-" * 40)
     # Only show chunks that have actual content (root_cause or fix_summary)
     meaningful_cases = [c for c in similar_cases if c.root_cause or c.fix_summary]
@@ -300,6 +269,33 @@ def generate_context_pack(
         lines.append(f"  (matched signals: {', '.join(similar_cases[0].matching_signals[:3])})")
     else:
         lines.append("No similar cases found (or below threshold)")
+    lines.append("")
+
+    # 4. Hypotheses
+    lines.append("-" * 40)
+    lines.append("4. TOP HYPOTHESES")
+    lines.append("-" * 40)
+    if hypotheses:
+        for i, hyp in enumerate(hypotheses, 1):
+            lines.append(f"{i}. {hyp.hypothesis}")
+            lines.append(f"   Evidence (L{hyp.line_number}): {hyp.evidence}")
+            lines.append("   How to confirm:")
+            for step in hyp.confirm_steps:
+                lines.append(f"   - {step}")
+            lines.append("")
+    else:
+        lines.append("No specific hypotheses - review log for details")
+    lines.append("")
+
+    # 5. Files to open
+    lines.append("-" * 40)
+    lines.append("5. FILES TO OPEN")
+    lines.append("-" * 40)
+    if related_files:
+        for f in related_files[:8]:
+            lines.append(f"  {f}")
+    else:
+        lines.append("NOT FOUND in snapshot")
     lines.append("")
 
     lines.append("=" * 60)

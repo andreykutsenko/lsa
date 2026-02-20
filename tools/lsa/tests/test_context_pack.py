@@ -142,8 +142,8 @@ class TestDecodedCodesSection:
         )
 
         # Find the decoded section specifically
-        section_start = context_pack.find("3b. PAPYRUS")
-        section_end = context_pack.find("3c. FILES")
+        section_start = context_pack.find("2b. PAPYRUS")
+        section_end = context_pack.find("2c. FILES")
         decoded_section = context_pack[section_start:section_end]
 
         # F should appear before E and I in the decoded section
@@ -316,8 +316,7 @@ class TestContextPackStructure:
         # Always-present sections (not conditional on data)
         required_sections = [
             "LSA CONTEXT PACK",
-            "MOST LIKELY FAILING NODE",
-            "EXECUTION CHAIN",
+            "PROCESS CONTEXT",
             "EVIDENCE",
             "TOP HYPOTHESES",
             "FILES TO OPEN",
@@ -328,7 +327,7 @@ class TestContextPackStructure:
         for section in required_sections:
             assert section in context_pack, f"Missing section: {section}"
 
-        # Section 3b is present because PPCS1001E is a formal Papyrus code
+        # Section 2b is present because PPCS1001E is a formal Papyrus code
         assert "PAPYRUS/DOCEXEC CODES" in context_pack
 
         # Section 6 (SUGGESTED COMMANDS) has been removed
@@ -336,7 +335,7 @@ class TestContextPackStructure:
 
     def test_sections_in_order(self, tmp_path):
         """Sections should appear in expected order."""
-        # Provide docdef_tokens so section 3c (FILES FROM LOG EVIDENCE) is present
+        # Provide docdef_tokens so section 2c (FILES FROM LOG EVIDENCE) is present
         log_analysis = make_log_analysis(
             error_codes=["PPCS1001E"],
             docdef_tokens=["BKFNDS11"],
@@ -357,9 +356,9 @@ class TestContextPackStructure:
 
         # Check order of key sections
         positions = {
-            "EVIDENCE": context_pack.find("3. EVIDENCE"),
-            "CODES": context_pack.find("3b. PAPYRUS/DOCEXEC"),
-            "FILES_LOG": context_pack.find("3c. FILES FROM LOG"),
+            "EVIDENCE": context_pack.find("2. EVIDENCE"),
+            "CODES": context_pack.find("2b. PAPYRUS/DOCEXEC"),
+            "FILES_LOG": context_pack.find("2c. FILES FROM LOG"),
             "HYPOTHESES": context_pack.find("4. TOP HYPOTHESES"),
         }
 

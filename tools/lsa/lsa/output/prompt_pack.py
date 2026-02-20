@@ -40,7 +40,6 @@ _INSTRUCTION_RU = """\
 По каждой гипотезе из TOP HYPOTHESES: валидна или шум — почему.\
 """
 
-_MAX_FILE_LINES = 200
 _MAX_SNIPPET_LINES = 50
 
 
@@ -65,34 +64,20 @@ def _extract_log_snippet(log_path: Path, error_line_numbers: list[int]) -> str:
     return "\n".join(numbered)
 
 
-def _read_file_content(path: str) -> str:
-    """Read a file, limiting to _MAX_FILE_LINES lines."""
-    try:
-        lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
-        if len(lines) > _MAX_FILE_LINES:
-            lines = lines[:_MAX_FILE_LINES]
-            lines.append(f"... (truncated at {_MAX_FILE_LINES} lines)")
-        return "\n".join(lines)
-    except OSError:
-        return "(file not readable)"
-
-
 def generate_ai_prompt(
     context_pack: str,
     log_path: Path,
     log_analysis: LogAnalysis,
-    related_files: list[str],
     lang: str = "en",
 ) -> str:
     """
     Generate a ready-to-paste AI prompt combining instruction, context pack,
-    log snippet, and source file contents.
+    and log snippet.
 
     Args:
         context_pack: Output of generate_context_pack()
         log_path: Path to the analyzed log file
         log_analysis: Parsed log analysis (for error line numbers)
-        related_files: List of absolute file paths from FILES TO OPEN
         lang: Output language instruction ('en' or 'ru')
     """
     instruction = _INSTRUCTION_RU if lang == "ru" else _INSTRUCTION_EN
@@ -107,25 +92,11 @@ def generate_ai_prompt(
         "CONTEXT PACK",
         "=" * 60,
         context_pack,
-    ]
-
-    parts += [
         "=" * 60,
         "LOG SNIPPET",
         "=" * 60,
         log_snippet,
         "",
     ]
-
-    if related_files:
-        parts += [
-            "=" * 60,
-            "SOURCE FILES",
-            "=" * 60,
-        ]
-        for file_path in related_files[:6]:  # limit to 6 files
-            parts.append(f"--- {Path(file_path).name} ---")
-            parts.append(_read_file_content(file_path))
-            parts.append("")
 
     return "\n".join(parts)
