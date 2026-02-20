@@ -111,11 +111,7 @@ def generate_context_pack(
         lines.append(f"Error codes: {', '.join(log_analysis.error_codes[:10])}")
     lines.append("")
 
-    # 3b. PAPYRUS/DOCEXEC CODES (decoded)
-    lines.append("-" * 40)
-    lines.append("3b. PAPYRUS/DOCEXEC CODES (decoded)")
-    lines.append("-" * 40)
-
+    # 3b. PAPYRUS/DOCEXEC CODES (decoded) — only shown when formal codes are present
     # Only show formal Papyrus/AFP codes — custom text signals belong in section 3, not here
     formal_codes = [c for c in log_analysis.error_codes if _FORMAL_CODE_RE.match(c)]
     fatal_codes = [c for c in formal_codes if c.upper().endswith('F')]
@@ -124,6 +120,9 @@ def generate_context_pack(
     codes_to_show = (fatal_codes + error_codes + other_formal)[:10]
 
     if codes_to_show:
+        lines.append("-" * 40)
+        lines.append("3b. PAPYRUS/DOCEXEC CODES (decoded)")
+        lines.append("-" * 40)
         for code in codes_to_show:
             if decoded_codes and code in decoded_codes:
                 entry = decoded_codes[code]
@@ -140,59 +139,57 @@ def generate_context_pack(
                 lines.append(f"  {body}")
             else:
                 lines.append(f"{code} - UNKNOWN CODE (not in KB yet)")
-    else:
-        lines.append("No Papyrus/DocExec codes found in log")
-    lines.append("")
+        lines.append("")
 
-    # 3c. FILES FROM LOG EVIDENCE
-    lines.append("-" * 40)
-    lines.append("3c. FILES FROM LOG EVIDENCE")
-    lines.append("-" * 40)
+    # 3c. FILES FROM LOG EVIDENCE — only shown when file references exist
+    has_file_refs = log_analysis.docdef_tokens or log_analysis.script_paths or log_analysis.io_paths
+    if has_file_refs:
+        lines.append("-" * 40)
+        lines.append("3c. FILES FROM LOG EVIDENCE")
+        lines.append("-" * 40)
 
-    # DOCDEF tokens
-    if log_analysis.docdef_tokens:
-        lines.append("DOCDEF tokens found:")
-        for token in log_analysis.docdef_tokens[:5]:
-            # Try to map to snapshot docdef path
-            docdef_path = snapshot_path / "docdef" / f"{token.lower()}.dfa"
-            if docdef_path.exists():
-                lines.append(f"  {token} -> {docdef_path}")
-            else:
-                lines.append(f"  {token} (docdef not found in snapshot)")
+        # DOCDEF tokens
+        if log_analysis.docdef_tokens:
+            lines.append("DOCDEF tokens found:")
+            for token in log_analysis.docdef_tokens[:5]:
+                # Try to map to snapshot docdef path
+                docdef_path = snapshot_path / "docdef" / f"{token.lower()}.dfa"
+                if docdef_path.exists():
+                    lines.append(f"  {token} -> {docdef_path}")
+                else:
+                    lines.append(f"  {token} (docdef not found in snapshot)")
 
-    # Script paths
-    if log_analysis.script_paths:
-        lines.append("Script paths:")
-        for script_path in log_analysis.script_paths[:5]:
-            # Map to snapshot (support both /home/master/ and /home/test/master/)
-            mapped = False
-            for prefix in ["/home/master/", "/home/test/master/"]:
-                if prefix in script_path:
-                    local_path = script_path.replace(prefix, "master/")
-                    full_path = snapshot_path / local_path
-                    if full_path.exists():
-                        lines.append(f"  {script_path} -> {full_path}")
-                        mapped = True
-                        break
-            if not mapped:
-                lines.append(f"  {script_path} (not in snapshot)")
+        # Script paths
+        if log_analysis.script_paths:
+            lines.append("Script paths:")
+            for script_path in log_analysis.script_paths[:5]:
+                # Map to snapshot (support both /home/master/ and /home/test/master/)
+                mapped = False
+                for prefix in ["/home/master/", "/home/test/master/"]:
+                    if prefix in script_path:
+                        local_path = script_path.replace(prefix, "master/")
+                        full_path = snapshot_path / local_path
+                        if full_path.exists():
+                            lines.append(f"  {script_path} -> {full_path}")
+                            mapped = True
+                            break
+                if not mapped:
+                    lines.append(f"  {script_path} (not in snapshot)")
 
-    # I/O paths (show as-is, don't dump content)
-    if log_analysis.io_paths:
-        lines.append("Input/Output paths (from log):")
-        for io_path in log_analysis.io_paths[:5]:
-            lines.append(f"  {io_path}")
+        # I/O paths (show as-is, don't dump content)
+        if log_analysis.io_paths:
+            lines.append("Input/Output paths (from log):")
+            for io_path in log_analysis.io_paths[:5]:
+                lines.append(f"  {io_path}")
 
-    if not (log_analysis.docdef_tokens or log_analysis.script_paths or log_analysis.io_paths):
-        lines.append("No file references extracted from log")
-    lines.append("")
+        lines.append("")
 
-    # 3d. EXTERNAL CONFIG SIGNALS
-    lines.append("-" * 40)
-    lines.append("3d. EXTERNAL CONFIG SIGNALS")
-    lines.append("-" * 40)
-
+    # 3d. EXTERNAL CONFIG SIGNALS — only shown when external signals exist
     if log_analysis.external_signals:
+        lines.append("-" * 40)
+        lines.append("3d. EXTERNAL CONFIG SIGNALS")
+        lines.append("-" * 40)
+
         # Sort by severity (F > E > W > I) and show top 5
         sorted_signals = sorted(
             log_analysis.external_signals,
@@ -232,9 +229,7 @@ def generate_context_pack(
             lines.append(
                 f"InfoTrac missing message IDs: {', '.join(log_analysis.infotrac_missing_message_ids)}"
             )
-    else:
-        lines.append("None found")
-    lines.append("")
+        lines.append("")
 
     # 4. Hypotheses
     lines.append("-" * 40)
@@ -263,26 +258,23 @@ def generate_context_pack(
         lines.append("NOT FOUND in snapshot")
     lines.append("")
 
-    # 6. Suggested commands
-    lines.append("-" * 40)
-    lines.append("6. SUGGESTED COMMANDS")
-    lines.append("-" * 40)
-    lines.append(f"# View full log")
-    lines.append(f"less {log_path}")
-    lines.append(f"# Search for errors")
-    lines.append(f"grep -n 'ERROR\\|FAIL\\|ORA-' {log_path}")
-    if log_analysis.error_codes:
-        first_code = log_analysis.error_codes[0]
-        lines.append(f"# Search for specific error")
-        lines.append(f"grep -ni '{first_code}' {log_path}")
-    lines.append("")
-
     # 7. Similar past cases
     lines.append("-" * 40)
     lines.append("7. SIMILAR PAST CASES")
     lines.append("-" * 40)
     # Only show chunks that have actual content (root_cause or fix_summary)
     meaningful_cases = [c for c in similar_cases if c.root_cause or c.fix_summary]
+
+    # Deduplicate by source_path — keep highest score per source file
+    seen_sources: set[str] = set()
+    deduped_cases = []
+    for case in meaningful_cases:
+        key = case.source_path or str(case.case_id)
+        if key not in seen_sources:
+            seen_sources.add(key)
+            deduped_cases.append(case)
+    meaningful_cases = deduped_cases
+
     if meaningful_cases:
         for case in meaningful_cases:
             lines.append(f"[{case.title or 'Untitled'}] (match: {case.match_score:.0%})")

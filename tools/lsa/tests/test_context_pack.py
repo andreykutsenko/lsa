@@ -155,8 +155,8 @@ class TestDecodedCodesSection:
         assert f_pos < e_pos, f"Fatal ({f_pos}) should be before Error ({e_pos})"
         assert e_pos < i_pos, f"Error ({e_pos}) should be before Info ({i_pos})"
 
-    def test_no_codes_message(self, tmp_path):
-        """Should show message when no codes found."""
+    def test_no_codes_section_absent_when_empty(self, tmp_path):
+        """Section 3b should be absent entirely when no formal codes are found."""
         log_analysis = make_log_analysis(error_codes=[])
 
         context_pack = generate_context_pack(
@@ -172,7 +172,7 @@ class TestDecodedCodesSection:
             decoded_codes={},
         )
 
-        assert "No Papyrus/DocExec codes found" in context_pack
+        assert "PAPYRUS/DOCEXEC CODES" not in context_pack
 
 
 class TestFilesFromLogEvidence:
@@ -248,8 +248,8 @@ class TestFilesFromLogEvidence:
         assert "/d/acbk/input/data.csv" in context_pack
         assert "/d/acbk/output/report.afp" in context_pack
 
-    def test_no_files_message(self, tmp_path):
-        """Should show message when no file references found."""
+    def test_no_files_section_absent_when_empty(self, tmp_path):
+        """Section 3c should be absent entirely when no file references are found."""
         log_analysis = make_log_analysis()
 
         context_pack = generate_context_pack(
@@ -265,7 +265,7 @@ class TestFilesFromLogEvidence:
             decoded_codes={},
         )
 
-        assert "No file references extracted" in context_pack
+        assert "FILES FROM LOG EVIDENCE" not in context_pack
 
     def test_docdef_mapped_to_snapshot(self, tmp_path):
         """DOCDEF tokens should be mapped to snapshot paths when found."""
@@ -297,7 +297,7 @@ class TestContextPackStructure:
     """Test overall context pack structure."""
 
     def test_all_sections_present(self, tmp_path):
-        """All required sections should be present."""
+        """All always-present sections should be in the output."""
         log_analysis = make_log_analysis(error_codes=["PPCS1001E"])
 
         context_pack = generate_context_pack(
@@ -313,16 +313,14 @@ class TestContextPackStructure:
             decoded_codes={},
         )
 
+        # Always-present sections (not conditional on data)
         required_sections = [
             "LSA CONTEXT PACK",
             "MOST LIKELY FAILING NODE",
             "EXECUTION CHAIN",
             "EVIDENCE",
-            "PAPYRUS/DOCEXEC CODES",
-            "FILES FROM LOG EVIDENCE",
             "TOP HYPOTHESES",
             "FILES TO OPEN",
-            "SUGGESTED COMMANDS",
             "SIMILAR PAST CASES",
             "END OF CONTEXT PACK",
         ]
@@ -330,9 +328,19 @@ class TestContextPackStructure:
         for section in required_sections:
             assert section in context_pack, f"Missing section: {section}"
 
+        # Section 3b is present because PPCS1001E is a formal Papyrus code
+        assert "PAPYRUS/DOCEXEC CODES" in context_pack
+
+        # Section 6 (SUGGESTED COMMANDS) has been removed
+        assert "SUGGESTED COMMANDS" not in context_pack
+
     def test_sections_in_order(self, tmp_path):
         """Sections should appear in expected order."""
-        log_analysis = make_log_analysis(error_codes=["PPCS1001E"])
+        # Provide docdef_tokens so section 3c (FILES FROM LOG EVIDENCE) is present
+        log_analysis = make_log_analysis(
+            error_codes=["PPCS1001E"],
+            docdef_tokens=["BKFNDS11"],
+        )
 
         context_pack = generate_context_pack(
             log_path=Path("/test/sample.log"),
