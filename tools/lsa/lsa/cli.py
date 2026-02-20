@@ -217,6 +217,8 @@ def explain(
     proc: str = typer.Option(None, "--proc", "-p", help="Force specific proc id/basename"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Show top 10 candidates with score breakdown"),
     no_persist: bool = typer.Option(False, "--no-persist", help="Don't persist analysis to incidents table"),
+    output_prompt: bool = typer.Option(False, "--prompt", help="Output AI-ready prompt (context pack + log snippet + source files)"),
+    lang: str = typer.Option("en", "--lang", help="Output language for --prompt instruction (en, ru)"),
 ):
     """
     Generate context pack for a log file.
@@ -228,6 +230,8 @@ def explain(
 
     Use --proc to force a specific proc (e.g., --proc bkfnds1).
     Use --debug to see matching candidates and their scores.
+    Use --prompt to output a ready-to-paste AI prompt with context pack, log snippet, and source files.
+    Use --lang to set the output language for --prompt instruction (en, ru).
     """
     snapshot = snapshot.resolve()
     log = log.resolve()
@@ -340,8 +344,18 @@ def explain(
         decoded_codes=decoded_codes,
     )
 
-    # Output (single block, no extra commentary)
-    print(context_pack)
+    if output_prompt:
+        from .output.prompt_pack import generate_ai_prompt
+        prompt = generate_ai_prompt(
+            context_pack=context_pack,
+            log_path=log,
+            log_analysis=log_analysis,
+            related_files=related_files,
+            lang=lang,
+        )
+        print(prompt)
+    else:
+        print(context_pack)
 
 
 def _has_fts_operators(query: str) -> bool:

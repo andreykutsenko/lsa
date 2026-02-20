@@ -18,6 +18,7 @@ class SimilarCase:
     root_cause: str | None
     fix_summary: str | None
     verify_commands: list[str]
+    source_path: str | None = None
 
 
 def find_similar_cases(
@@ -122,6 +123,7 @@ def find_similar_cases(
             root_cause=root_cause,
             fix_summary=fix_summary,
             verify_commands=verify_commands[:3],
+            source_path=card.get("source_path"),
         ))
 
     # Sort by score and return top N

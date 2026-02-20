@@ -372,8 +372,8 @@ class TestContextPackExternalSignals:
         assert "197131" in context_pack
         assert "estmt" in context_pack
 
-    def test_context_pack_shows_none_when_no_signals(self, tmp_path):
-        """Context pack should show 'None found' when no external signals."""
+    def test_context_pack_section_absent_when_no_signals(self, tmp_path):
+        """Section 3d should be absent entirely when no external signals."""
         from lsa.output.context_pack import generate_context_pack
         from pathlib import Path
 
@@ -396,8 +396,7 @@ class TestContextPackExternalSignals:
             decoded_codes={},
         )
 
-        assert "EXTERNAL CONFIG SIGNALS" in context_pack
-        assert "None found" in context_pack
+        assert "EXTERNAL CONFIG SIGNALS" not in context_pack
 
 
 class TestRulesLoading:
