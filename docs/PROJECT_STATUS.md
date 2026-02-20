@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-02-18
+**Last Updated:** 2026-02-19
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -22,7 +22,7 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] `lsa scan` — index snapshot, build execution graph from .procs
 - [x] `lsa stats` — show artifact/graph/KB statistics
 - [x] `lsa search` — full-text search in artifacts (FTS5)
-- [x] `lsa explain` — analyze log, generate context pack
+- [x] `lsa explain` — analyze log, generate context pack; `--prompt [--lang ru]` outputs AI-ready prompt
 - [x] `lsa import-codes` — import Papyrus/DocExec codes from PDF
 - [x] `lsa import-histories` — import case cards from debugging sessions
 - [x] `lsa incidents` — list analyzed log incidents
@@ -47,9 +47,11 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] DFA letter-number filtering: Letter 14 excludes DL015 even if in .procs
 - [x] Plan output modes: default (winner + compact), `--all`, `--json`, `--cursor`
 - [x] i18n for plan output: `--lang en` (default) / `--lang ru`
+- [x] explain output cleanup: sections 3b/3c/3d conditional, section 6 removed, section 7 deduplicated by source
+- [x] explain `--prompt [--lang en|ru]`: AI-ready prompt with instruction + context pack + log snippet + source files
 
 ### Tests
-- [x] 130 tests passing
+- [x] 130 tests passing (as of 2026-02-19)
 - [x] test_wrapper_noise.py
 - [x] test_message_codes.py
 - [x] test_external_signals.py
@@ -93,6 +95,31 @@ uv run lsa plan "$SNAP" --cid WCCU --title "WCCU Letter 14 - Business Rate/Payme
 uv run lsa plan "$SNAP" --cid WCCU --title "Letter 14" --json
 uv run lsa plan "$SNAP" --cid WCCU --title "Letter 14" --cursor --lang ru
 ```
+
+---
+
+## `lsa explain --prompt` Design Notes
+
+**What it does:** Generates a ready-to-paste AI prompt from a log analysis.
+
+**Output structure:**
+1. Instruction block (role + task description + output format) — in English or Russian
+2. Full context pack (sections 1–7, filtered)
+3. Log snippet: ±50 lines around the first error signal
+4. Source file contents: up to 6 files, 200 lines each (scripts, inserts, procs)
+
+**Flags:**
+- `--prompt` — activate AI prompt mode (default: plain context pack)
+- `--lang en|ru` — instruction language (default: `en`)
+
+**Verify on real snapshot:**
+```bash
+SNAP="/mnt/c/Users/akutsenko/code/rhs_snapshot_project/rhs_snapshot_20260127_170100"
+LOG="/d/daily/idcumv1/idcumv1.log"
+uv run lsa explain "$SNAP" "$LOG" --prompt --lang ru
+```
+
+**Source:** `tools/lsa/lsa/output/prompt_pack.py`
 
 ---
 
