@@ -92,14 +92,36 @@ def find_similar_cases(
         except json.JSONDecodeError:
             verify_commands = []
 
+        root_cause = card["root_cause"]
+        fix_summary = card["fix_summary"]
+
+        # If this chunk has no content, look for a sibling chunk from the same source file
+        if not root_cause and not fix_summary and card.get("source_path"):
+            sibling = conn.execute(
+                """SELECT root_cause, fix_summary, verify_commands_json
+                   FROM case_cards
+                   WHERE source_path = ?
+                     AND (root_cause IS NOT NULL OR fix_summary IS NOT NULL)
+                   LIMIT 1""",
+                (card["source_path"],),
+            ).fetchone()
+            if sibling:
+                sibling = dict(sibling)
+                root_cause = sibling.get("root_cause")
+                fix_summary = sibling.get("fix_summary")
+                try:
+                    verify_commands = json.loads(sibling.get("verify_commands_json") or "[]")
+                except json.JSONDecodeError:
+                    pass
+
         similar.append(SimilarCase(
             case_id=card["id"],
             title=card["title"],
             match_score=score,
             matching_signals=list(signal_overlap),
-            root_cause=card["root_cause"],
-            fix_summary=card["fix_summary"],
-            verify_commands=verify_commands[:3],  # Limit commands
+            root_cause=root_cause,
+            fix_summary=fix_summary,
+            verify_commands=verify_commands[:3],
         ))
 
     # Sort by score and return top N
