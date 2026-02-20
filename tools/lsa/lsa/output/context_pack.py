@@ -248,20 +248,12 @@ def generate_context_pack(
         for case in meaningful_cases:
             lines.append(f"[{case.title or 'Untitled'}] (match: {case.match_score:.0%})")
             if case.root_cause:
-                cause = case.root_cause
-                if len(cause) > 80:
-                    cause = cause[:80] + "..."
-                lines.append(f"  Root cause: {cause}")
+                lines.append(f"  Root cause: {case.root_cause}")
             if case.fix_summary:
-                fix = case.fix_summary
-                if len(fix) > 80:
-                    fix = fix[:80] + "..."
-                lines.append(f"  Fix: {fix}")
+                lines.append(f"  Fix: {case.fix_summary}")
             if case.verify_commands:
                 lines.append("  Verify commands:")
-                for cmd in case.verify_commands[:2]:
-                    if len(cmd) > 60:
-                        cmd = cmd[:60] + "..."
+                for cmd in case.verify_commands:
                     lines.append(f"    {cmd}")
             lines.append("")
     elif similar_cases:
