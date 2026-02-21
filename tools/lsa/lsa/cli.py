@@ -892,6 +892,7 @@ def plan(
     show_all: bool = typer.Option(False, "--all", help="Show full details for all candidates"),
     output_json: bool = typer.Option(False, "--json", help="Print only JSON to stdout"),
     output_cursor: bool = typer.Option(False, "--cursor", help="Print ready-to-paste Cursor prompt"),
+    output_mermaid: bool = typer.Option(False, "--mermaid", help="Output Mermaid diagram of call structure"),
     lang: str = typer.Option("en", "--lang", help="Output language (en, ru)"),
 ):
     """
@@ -906,6 +907,7 @@ def plan(
         --all       Full details for every candidate
         --json      Machine-readable JSON only
         --cursor    Markdown prompt for Cursor IDE with embedded JSON
+        --mermaid   Mermaid graph TD diagram of call structure
         --lang XX   Output language: en (default), ru
 
     Examples:
@@ -913,6 +915,7 @@ def plan(
         lsa plan $SNAP --title "WCCU Letter 14 monthly update"
         lsa plan $SNAP --cid WCCU --title "Letter 14" --json
         lsa plan $SNAP --cid WCCU --title "Letter 14" --cursor
+        lsa plan $SNAP --title idcumv1 --mermaid
     """
     snapshot = snapshot.resolve()
 
@@ -940,7 +943,14 @@ def plan(
             debug=debug,
         )
 
-    if output_json:
+    if output_mermaid:
+        if not candidates:
+            console.print("[red]Error:[/red] No matching proc found — cannot generate Mermaid diagram.")
+            raise typer.Exit(1)
+        from .output.mermaid import generate_mermaid
+        print(generate_mermaid(candidates[0], snapshot))
+        raise typer.Exit()
+    elif output_json:
         from .analysis.planner import format_plan_json
         data = format_plan_json(intent, candidates, snapshot)
         print(json.dumps(data, indent=2, ensure_ascii=False))
