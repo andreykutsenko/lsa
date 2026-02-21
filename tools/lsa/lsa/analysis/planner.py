@@ -412,6 +412,20 @@ def build_bundle(
         for code in procs_dfa_codes:
             _resolve_dfa(conn, code, "procs_dfa_token", candidate, seen_dfa_paths)
 
+    # 6. Helper scripts in master/ matching proc_name prefix (e.g. idcumv1_*.pl/py/sh)
+    existing_paths = {f.path for f in candidate.files}
+    helper_rows = conn.execute(
+        "SELECT path FROM artifacts WHERE kind = 'script' AND path LIKE ?",
+        (f"master/{candidate.proc_name}_%",),
+    ).fetchall()
+    for row in helper_rows:
+        if row["path"] not in existing_paths:
+            candidate.files.append(BundleFile(
+                path=row["path"],
+                kind="script",
+                source="helper_prefix_match",
+            ))
+
 
 # ── Title phrase extraction ───────────────────────────────────────────────────
 
