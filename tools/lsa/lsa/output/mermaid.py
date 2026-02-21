@@ -1,5 +1,7 @@
-"""Generate Mermaid graph TD diagrams from LSA bundle candidates."""
+"""Generate Mermaid graph TD diagrams and ASCII call trees from LSA bundle candidates."""
+import base64
 import re
+import zlib
 from pathlib import Path
 
 from ..analysis.planner import BundleCandidate
@@ -114,3 +116,90 @@ def generate_mermaid(bundle: BundleCandidate, snapshot_path: Path) -> str:
         lines.append(f"    {proc_id} -.->|helper| {node_id}")
 
     return "\n".join(lines)
+
+
+def generate_ascii_call_tree(bundle: BundleCandidate, snapshot_path: Path) -> str:
+    """Render ASCII call tree showing proc → scripts → helpers recursively."""
+    all_script_files = [f for f in bundle.files if f.kind == "script"]
+    script_paths: dict[str, Path] = {
+        _basename(f.path): snapshot_path / f.path
+        for f in all_script_files
+    }
+    call_graph = build_call_graph(script_paths)
+    runs_files = [f for f in bundle.files if f.source == "RUNS_edge"]
+
+    result: list[str] = []
+
+    def _render_children(parent_bn: str, indent: str) -> None:
+        children = call_graph.get(parent_bn, [])
+        for i, child_bn in enumerate(children):
+            is_last = i == len(children) - 1
+            connector = "└── " if is_last else "├── "
+            result.append(indent + connector + child_bn)
+            _render_children(child_bn, indent + ("    " if is_last else "│   "))
+
+    proc_prefix = f"  {bundle.proc_name} ──RUNS──► "
+    child_indent = " " * len(proc_prefix)
+    for f in runs_files:
+        bn = _basename(f.path)
+        result.append(proc_prefix + bn)
+        _render_children(bn, child_indent)
+
+    return "\n".join(result)
+
+
+def generate_scripts_mermaid(bundle: BundleCandidate, snapshot_path: Path) -> str:
+    """Return a scripts-only Mermaid diagram (proc + scripts + call edges, no controls/DFA)."""
+    all_script_files = [f for f in bundle.files if f.kind == "script"]
+    script_paths: dict[str, Path] = {
+        _basename(f.path): snapshot_path / f.path
+        for f in all_script_files
+    }
+    call_graph = build_call_graph(script_paths)
+    runs_files = [f for f in bundle.files if f.source == "RUNS_edge"]
+    runs_basenames = {_basename(f.path) for f in runs_files}
+
+    called_scripts: set[str] = set()
+    for targets in call_graph.values():
+        called_scripts.update(targets)
+
+    lines: list[str] = ["graph TD"]
+    proc_id = _sanitize_id(bundle.proc_name)
+    lines.append(f'    {proc_id}["{bundle.proc_name}\\n{bundle.display_name}"]')
+
+    for f in runs_files:
+        bn = _basename(f.path)
+        node_id = _sanitize_id(_stem(f.path))
+        lines.append(f'    {node_id}["{bn}"]')
+        lines.append(f"    {proc_id} -->|RUNS| {node_id}")
+
+    for caller_bn, targets in call_graph.items():
+        caller_id = _sanitize_id(Path(caller_bn).stem)
+        for target_bn in targets:
+            target_id = _sanitize_id(Path(target_bn).stem)
+            if target_bn not in runs_basenames:
+                lines.append(f'    {target_id}["{target_bn}"]')
+            lines.append(f"    {caller_id} -->|calls| {target_id}")
+
+    orphan_helpers = [
+        f for f in bundle.files
+        if f.source == "helper_prefix_match"
+        and _basename(f.path) not in called_scripts
+        and _basename(f.path) not in runs_basenames
+    ]
+    for f in orphan_helpers:
+        bn = _basename(f.path)
+        node_id = _sanitize_id(_stem(f.path))
+        lines.append(f'    {node_id}["{bn}"]')
+        lines.append(f"    {proc_id} -.->|helper| {node_id}")
+
+    return "\n".join(lines)
+
+
+def to_mermaid_live_url(code: str) -> str:
+    """Encode Mermaid diagram as a mermaid.live edit URL using pako compression."""
+    data = code.encode("utf-8")
+    compress_obj = zlib.compressobj(9, zlib.DEFLATED, -15)  # raw deflate (pako-compatible)
+    compressed = compress_obj.compress(data) + compress_obj.flush()
+    encoded = base64.urlsafe_b64encode(compressed).rstrip(b"=").decode()
+    return f"https://mermaid.live/edit#pako:{encoded}"
