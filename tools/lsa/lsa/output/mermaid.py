@@ -197,9 +197,20 @@ def generate_scripts_mermaid(bundle: BundleCandidate, snapshot_path: Path) -> st
 
 
 def to_mermaid_live_url(code: str) -> str:
-    """Encode Mermaid diagram as a mermaid.live edit URL using pako compression."""
-    data = code.encode("utf-8")
-    compress_obj = zlib.compressobj(9, zlib.DEFLATED, -15)  # raw deflate (pako-compatible)
-    compressed = compress_obj.compress(data) + compress_obj.flush()
+    """Encode Mermaid diagram as a mermaid.live edit URL.
+
+    mermaid.live SerdeType: {code: string, mermaid: string (JSON), autoSync, updateDiagram}
+    Encoding: base64url( zlib.compress( JSON.stringify(state) ) )
+    zlib.compress = pako.deflate default (with zlib header + Adler-32).
+    """
+    import json
+    state = {
+        "code": code,
+        "mermaid": json.dumps({"theme": "default"}),  # must be a JSON string, not object
+        "autoSync": True,
+        "updateDiagram": True,
+    }
+    data = json.dumps(state, separators=(",", ":")).encode("utf-8")
+    compressed = zlib.compress(data, level=9)
     encoded = base64.urlsafe_b64encode(compressed).rstrip(b"=").decode()
     return f"https://mermaid.live/edit#pako:{encoded}"
