@@ -943,14 +943,7 @@ def plan(
             debug=debug,
         )
 
-    if output_mermaid:
-        if not candidates:
-            console.print("[red]Error:[/red] No matching proc found — cannot generate Mermaid diagram.")
-            raise typer.Exit(1)
-        from .output.mermaid import generate_mermaid
-        print(generate_mermaid(candidates[0], snapshot))
-        raise typer.Exit()
-    elif output_json:
+    if output_json:
         from .analysis.planner import format_plan_json
         data = format_plan_json(intent, candidates, snapshot)
         print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -961,6 +954,14 @@ def plan(
     else:
         output = format_plan_output(intent, candidates, snapshot, debug=debug, show_all=show_all, lang=lang)
         print(output)
+        if output_mermaid and candidates:
+            from .output.mermaid import generate_ascii_call_tree, generate_scripts_mermaid, to_mermaid_live_url
+            print()
+            print("═══ CALL TREE ═══")
+            print(generate_ascii_call_tree(candidates[0], snapshot))
+            url = to_mermaid_live_url(generate_scripts_mermaid(candidates[0], snapshot))
+            print()
+            print(f"Diagram: {url}")
 
 
 if __name__ == "__main__":
