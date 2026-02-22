@@ -49,7 +49,7 @@ class TestDeepPrompt:
         assert "диаграмм" in result
 
     def test_prompt_contains_file_section(self, tmp_path):
-        """Output must contain the SOURCE FILES header."""
+        """Output must contain the FILES TO READ header."""
         bundle = _make_bundle(tmp_path)
         result = generate_deep_prompt(bundle, tmp_path, lang="en")
-        assert "SOURCE FILES" in result
+        assert "FILES TO READ" in result
