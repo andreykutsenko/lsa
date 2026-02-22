@@ -893,6 +893,7 @@ def plan(
     output_json: bool = typer.Option(False, "--json", help="Print only JSON to stdout"),
     output_cursor: bool = typer.Option(False, "--cursor", help="Print ready-to-paste Cursor prompt"),
     output_mermaid: bool = typer.Option(False, "--mermaid", help="Output Mermaid diagram of call structure"),
+    output_deep: bool = typer.Option(False, "--deep", help="Generate AI prompt for deep Papyrus flow analysis"),
     lang: str = typer.Option("en", "--lang", help="Output language (en, ru)"),
 ):
     """
@@ -908,6 +909,7 @@ def plan(
         --json      Machine-readable JSON only
         --cursor    Markdown prompt for Cursor IDE with embedded JSON
         --mermaid   Mermaid graph TD diagram of call structure
+        --deep      AI prompt for full Papyrus flow analysis (DFA per job_sel, Mermaid)
         --lang XX   Output language: en (default), ru
 
     Examples:
@@ -916,6 +918,7 @@ def plan(
         lsa plan $SNAP --cid WCCU --title "Letter 14" --json
         lsa plan $SNAP --cid WCCU --title "Letter 14" --cursor
         lsa plan $SNAP --title idcumv1 --mermaid
+        lsa plan $SNAP --title idcumv1 --deep
     """
     snapshot = snapshot.resolve()
 
@@ -962,6 +965,14 @@ def plan(
             url = to_mermaid_live_url(generate_scripts_mermaid(candidates[0], snapshot))
             print()
             print(f"Diagram: {url}")
+
+        if output_deep and candidates:
+            from .output.deep_prompt import generate_deep_prompt
+            print()
+            print("=" * 60)
+            print("DEEP ANALYSIS PROMPT (paste to AI)")
+            print("=" * 60)
+            print(generate_deep_prompt(candidates[0], snapshot, lang=lang))
 
 
 if __name__ == "__main__":

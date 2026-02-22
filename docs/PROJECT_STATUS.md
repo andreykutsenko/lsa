@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-02-19
+**Last Updated:** 2026-02-21
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -16,7 +16,7 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 
 ---
 
-## Done (v0.1.0)
+## Done (v0.2.0)
 
 ### Core Commands
 - [x] `lsa scan` — index snapshot, build execution graph from .procs
@@ -49,9 +49,10 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] i18n for plan output: `--lang en` (default) / `--lang ru`
 - [x] explain output cleanup: sections 3b/3c/3d conditional, section 6 removed, section 7 deduplicated by source
 - [x] explain `--prompt [--lang en|ru]`: AI-ready prompt with instruction + context pack + log snippet + source files
+- [x] plan --deep: AI prompt for full Papyrus flow analysis (DFA per job_sel, output artifacts, Mermaid diagram)
 
 ### Tests
-- [x] 130 tests passing (as of 2026-02-19)
+- [x] 145 tests passing (as of 2026-02-21)
 - [x] test_wrapper_noise.py
 - [x] test_message_codes.py
 - [x] test_external_signals.py
