@@ -32,7 +32,7 @@ LSA automates context gathering through:
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  SNAPSHOT DIRECTORIES                                                       │
-│  ├── procs/*.procs      ─────▶  Parse: extract RUNS, READS, CALLS          │
+│  ├── procs/*.procs      ─────▶  Parse: extract shell_script (RUNS)          │
 │  ├── master/scripts/*   ─────▶  Index: sha256, text_content                │
 │  ├── control/*          ─────▶  Index + link to docdefs                    │
 │  ├── insert/*           ─────▶  Index                                       │
@@ -46,12 +46,13 @@ LSA automates context gathering through:
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                     │
 │  │  artifacts  │    │    nodes    │    │    edges    │                     │
 │  ├─────────────┤    ├─────────────┤    ├─────────────┤                     │
-│  │ path        │    │ type=proc   │    │ src → dst   │                     │
-│  │ kind        │    │ key         │───▶│ rel_type:   │                     │
-│  │ text_content│    │ display_name│    │  RUNS       │                     │
-│  │ sha256      │    │ canonical_  │    │  READS      │                     │
-│  └─────────────┘    │   path      │    │  CALLS      │                     │
-│         │           └─────────────┘    └─────────────┘                     │
+│  │ path        │    │ type=       │    │ src → dst   │                     │
+│  │ kind        │    │  proc,script│───▶│ rel_type:   │                     │
+│  │ text_content│    │ key         │    │  RUNS       │                     │
+│  │ sha256      │    │ display_name│    │             │                     │
+│  └─────────────┘    │ canonical_  │    └─────────────┘                     │
+│         │           │   path      │                                         │
+│         │           └─────────────┘                                         │
 │         ▼                                                                   │
 │  ┌─────────────┐                                                           │
 │  │artifacts_fts│  ◀── FTS5 full-text search index                          │
@@ -61,8 +62,8 @@ LSA automates context gathering through:
 
 **What gets built:**
 - **artifacts** — all files with metadata and content (for search)
-- **nodes** — graph vertices (proc, script, control, docdef)
-- **edges** — graph edges with relationship type (RUNS, READS, CALLS)
+- **nodes** — graph vertices (proc, script)
+- **edges** — graph edges (RUNS — proc runs script)
 - **artifacts_fts** — FTS5 index for full-text search
 
 ## Phase 2: Knowledge Base Enrichment
@@ -125,15 +126,14 @@ trace.log ──▶ LogAnalysis {
 ```
 LogAnalysis.prefix_tokens ──┐
 LogAnalysis.script_paths  ──┼──▶  SCORING ALGORITHM  ──▶  Best Match
-LogAnalysis.docdef_tokens ──┘         │
-                                      │
+                            │         │
+                            ┘         │
 ┌─────────────────────────────────────┴────────────────────────────────┐
 │  SELECT * FROM nodes WHERE type='proc'                               │
 │                                                                      │
 │  Score each node:                                                    │
 │    +50 pts: prefix_token matches node.key (bkfnds1 → proc:bkfnds1)  │
 │    +30 pts: script_path in node's RUNS edges                        │
-│    +20 pts: docdef_token in node's downstream                       │
 │    +10 pts: log filename similarity                                  │
 │                                                                      │
 │  Result: proc:bkfnds1 (confidence: 87%)                             │
@@ -145,18 +145,13 @@ LogAnalysis.docdef_tokens ──┘         │
 ```
 SELECT * FROM edges WHERE src = node_id OR dst = node_id
 
-┌────────────┐      RUNS       ┌────────────┐      READS     ┌─────────┐
-│ proc:      │ ───────────────▶│ script:    │ ──────────────▶│ control:│
-│ bkfnds1    │                 │ bkfn_gen.sh│                │ bkfn.ctl│
-└────────────┘                 └────────────┘                └─────────┘
-      │                                                           │
-      │ RUNS                                               REFERS_TO
-      ▼                                                           ▼
-┌────────────┐                                             ┌─────────┐
-│ script:    │                                             │ docdef: │
-│ bkfn_load  │                                             │ BKFNDS11│
-└────────────┘                                             └─────────┘
+┌────────────┐      RUNS       ┌────────────┐
+│ proc:      │ ───────────────▶│ script:    │
+│ bkfnds1    │                 │ bkfn_gen.sh│
+└────────────┘                 └────────────┘
 ```
+
+Note: Control, insert, and docdef files are resolved via artifact lookup in `lsa plan`, not via graph edges.
 
 ### Step 4: Extract External Signals (Rules Engine)
 

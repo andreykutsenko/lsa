@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-02-21
+**Last Updated:** 2026-02-23
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -29,7 +29,7 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] `lsa plan` — bundle planner: find proc, collect files, rank candidates
 
 ### Features
-- [x] Execution graph: nodes (proc, script, control, docdef) + edges (RUNS, READS, CALLS)
+- [x] Execution graph: nodes (proc, script) + edges (RUNS); other file types resolved via artifact lookup
 - [x] Log-to-proc matching with confidence scoring
 - [x] External signals detection (YAML rules engine)
   - InfoTrac missing message_id
@@ -52,7 +52,7 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] plan --deep: AI prompt for full Papyrus flow analysis (DFA per job_sel, output artifacts, Mermaid diagram)
 
 ### Tests
-- [x] 145 tests passing (as of 2026-02-21)
+- [x] 145 tests passing (as of 2026-02-23)
 - [x] test_wrapper_noise.py
 - [x] test_message_codes.py
 - [x] test_external_signals.py
@@ -68,7 +68,7 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 **What it does:** Given CID / jobid / free-text title, finds matching proc(s) and bundles related files:
 1. `.procs` file
 2. Scripts (via RUNS edges)
-3. Inserts (via READS edges)
+3. Inserts (via artifact lookup from procs parsed_json)
 4. Control files (job-family prefix match + letter_number filter)
 5. DFA/docdef files (from control `*_format_dfa` + procs DFA tokens)
 
