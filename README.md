@@ -366,4 +366,4 @@ Internal use only. Not for distribution.
 
 ---
 
-*LSA v0.1.0 — Legacy Script Archaeologist*
+*LSA v0.2.0 — Legacy Script Archaeologist*
