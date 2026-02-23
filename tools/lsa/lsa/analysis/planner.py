@@ -7,6 +7,7 @@ that can be opened in an IDE.
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from dataclasses import dataclass, field
@@ -359,19 +360,26 @@ def build_bundle(
                 source="RUNS_edge",
             ))
 
-    # 3. READS edges → inserts
-    reads = conn.execute(
-        "SELECT n.canonical_path, n.key FROM edges e JOIN nodes n ON e.dst = n.id "
-        "WHERE e.src = ? AND e.rel_type = 'READS'",
-        (node_id,),
-    ).fetchall()
-    for row in reads:
-        if row["canonical_path"]:
-            candidate.files.append(BundleFile(
-                path=row["canonical_path"],
-                kind="insert",
-                source="READS_edge",
-            ))
+    # 3. Insert file — from procs parsed_json → artifact lookup
+    proc_row = conn.execute(
+        "SELECT parsed_json FROM procs WHERE proc_name = ?",
+        (candidate.proc_name,),
+    ).fetchone()
+    if proc_row:
+        parsed = json.loads(proc_row["parsed_json"])
+        file_setup = parsed.get("file_setup")
+        if file_setup:
+            insert_name = Path(file_setup).name
+            art = conn.execute(
+                "SELECT path FROM artifacts WHERE kind='insert' AND path LIKE ?",
+                (f"%{insert_name}",),
+            ).fetchone()
+            if art:
+                candidate.files.append(BundleFile(
+                    path=art["path"],
+                    kind="insert",
+                    source="procs_file_setup",
+                ))
 
     # 4. Control files — prefer job-family prefix over bare CID
     cid = intent.cid or candidate.proc_name[:4]

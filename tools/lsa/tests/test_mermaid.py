@@ -99,7 +99,7 @@ class TestGenerateMermaid:
         """Output should contain script and insert nodes with correct edge labels."""
         files = [
             BundleFile(path="master/idcu_visa_process.sh", kind="script", source="RUNS_edge"),
-            BundleFile(path="insert/idcumv1.ins", kind="insert", source="READS_edge"),
+            BundleFile(path="insert/idcumv1.ins", kind="insert", source="procs_file_setup"),
         ]
         bundle = self._make_bundle("idcumv1", "IDCU - Visa Stmt", files)
         result = generate_mermaid(bundle, tmp_path)

@@ -33,7 +33,6 @@ def match_log_to_node(
 
     Scoring weights:
     - PREFIX= token exact match: +2.0 (strongest signal)
-    - DOCDEF reference match: +1.5
     - Script path match: +1.2
     - Proc name from log path: +1.0
     - JID token match: +0.5
@@ -93,24 +92,7 @@ def match_log_to_node(
             for row in rows:
                 add_candidate(dict(row), f"prefix_partial:{prefix}", 1.5)
 
-    # Strategy 2: DOCDEF reference match
-    for docdef_ref in log_analysis.docdef_refs:
-        # Find procs that use this docdef
-        rows = conn.execute(
-            """
-            SELECT p.* FROM nodes p
-            JOIN edges e ON p.id = e.src
-            JOIN nodes d ON e.dst = d.id
-            WHERE p.type = 'proc'
-            AND d.type = 'docdef'
-            AND (d.display_name LIKE ? OR d.key LIKE ?)
-            """,
-            (f"%{docdef_ref}%", f"%{docdef_ref.lower()}%")
-        ).fetchall()
-        for row in rows:
-            add_candidate(dict(row), f"docdef:{docdef_ref}", 1.5)
-
-    # Strategy 3: Script path match
+    # Strategy 2: Script path match
     for script_path in log_analysis.script_paths:
         script_name = Path(script_path).name
         # Find procs that RUNS this script
@@ -129,7 +111,7 @@ def match_log_to_node(
         for row in rows:
             add_candidate(dict(row), f"script:{script_name}", 1.2)
 
-    # Strategy 4: Extract proc name from log path
+    # Strategy 3: Extract proc name from log path
     proc_name = extract_proc_name_from_log_path(log_path)
     if proc_name:
         # Exact match first
@@ -160,7 +142,7 @@ def match_log_to_node(
             for row in rows:
                 add_candidate(dict(row), f"path_partial:{proc_name}", 0.7)
 
-    # Strategy 5: JID token match
+    # Strategy 4: JID token match
     for jid in log_analysis.jid_tokens:
         rows = conn.execute(
             "SELECT * FROM nodes WHERE type = 'proc' AND key LIKE ?",
@@ -169,7 +151,7 @@ def match_log_to_node(
         for row in rows:
             add_candidate(dict(row), f"jid:{jid}", 0.5)
 
-    # Strategy 6: CID match (lowest weight - too general)
+    # Strategy 5: CID match (lowest weight - too general)
     cid = extract_cid_from_log_path(log_path)
     if cid:
         rows = conn.execute(
@@ -190,7 +172,7 @@ def match_log_to_node(
 
     # Normalize confidence to 0-1 range
     best = sorted_candidates[0]
-    max_possible = 2.0 + 1.5 + 1.2 + 1.0  # If all strategies match
+    max_possible = 2.0 + 1.2 + 1.0  # If all strategies match
     confidence = min(1.0, best.total_score / max_possible)
 
     debug_result = sorted_candidates[:10] if debug else None

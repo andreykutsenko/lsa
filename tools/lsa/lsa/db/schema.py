@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS procs (
 -- Graph nodes
 CREATE TABLE IF NOT EXISTS nodes (
     id INTEGER PRIMARY KEY,
-    type TEXT NOT NULL,  -- 'proc', 'script', 'control', 'insert', 'docdef', 'log'
+    type TEXT NOT NULL,  -- 'proc', 'script'
     key TEXT NOT NULL UNIQUE,  -- canonical identifier
     display_name TEXT NOT NULL,
     canonical_path TEXT,  -- snapshot-relative path
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS edges (
     id INTEGER PRIMARY KEY,
     src INTEGER NOT NULL REFERENCES nodes(id),
     dst INTEGER NOT NULL REFERENCES nodes(id),
-    rel_type TEXT NOT NULL,  -- 'RUNS', 'READS', 'CALLS', 'REFERS_TO'
+    rel_type TEXT NOT NULL,  -- 'RUNS'
     confidence REAL DEFAULT 1.0,
     evidence_json TEXT  -- {file, line_no, line_text}
 );

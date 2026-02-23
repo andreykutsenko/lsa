@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from ..db.connection import insert_node, insert_edge
-from ..parsers.procs_parser import ProcsData, extract_referenced_scripts, extract_referenced_resources
+from ..parsers.procs_parser import ProcsData
 from ..utils.paths import map_unix_to_snapshot
 
 
@@ -70,106 +70,6 @@ def build_graph_from_procs(
                 )
                 stats["edges_created"] += 1
 
-        # Process file setup (insert file)
-        if procs_data.file_setup:
-            insert_node_id = _create_resource_node(
-                conn, procs_data.file_setup, "insert", snapshot_path
-            )
-            if insert_node_id:
-                stats["nodes_created"] += 1
-
-                evidence = {
-                    "file": f"procs/{proc_name}.procs",
-                    "line_no": procs_data.file_setup_line,
-                    "line_text": f"__File Setup: {procs_data.file_setup}",
-                }
-                insert_edge(
-                    conn,
-                    src=proc_node_id,
-                    dst=insert_node_id,
-                    rel_type="READS",
-                    confidence=1.0,
-                    evidence_json=json.dumps(evidence),
-                )
-                stats["edges_created"] += 1
-
-        # Process log file reference
-        if procs_data.log_file:
-            log_node_id = _create_resource_node(
-                conn, procs_data.log_file, "log", snapshot_path
-            )
-            if log_node_id:
-                stats["nodes_created"] += 1
-
-                evidence = {
-                    "file": f"procs/{proc_name}.procs",
-                    "line_no": procs_data.log_file_line,
-                    "line_text": f"__Log File: {procs_data.log_file}",
-                }
-                insert_edge(
-                    conn,
-                    src=proc_node_id,
-                    dst=log_node_id,
-                    rel_type="READS",
-                    confidence=0.9,
-                    evidence_json=json.dumps(evidence),
-                )
-                stats["edges_created"] += 1
-
-        # Process cross-references to other .procs files
-        for cross_ref in procs_data.cross_refs:
-            ref_proc_name = Path(cross_ref).stem.lower()
-            ref_node_id = insert_node(
-                conn,
-                node_type="proc",
-                key=f"proc:{ref_proc_name}",
-                display_name=ref_proc_name,
-                canonical_path=f"procs/{ref_proc_name}.procs",
-                original_path=cross_ref,
-                confidence=0.8,
-            )
-
-            evidence = {
-                "file": f"procs/{proc_name}.procs",
-                "line_no": None,
-                "line_text": f"refer to {cross_ref}",
-            }
-            insert_edge(
-                conn,
-                src=proc_node_id,
-                dst=ref_node_id,
-                rel_type="REFERS_TO",
-                confidence=0.9,
-                evidence_json=json.dumps(evidence),
-            )
-            stats["edges_created"] += 1
-
-        # Process other resource references
-        for resource_path, resource_type in extract_referenced_resources(procs_data):
-            if resource_path == procs_data.file_setup:
-                continue  # Already processed
-
-            resource_node_id = _create_resource_node(
-                conn, resource_path, resource_type, snapshot_path
-            )
-            if resource_node_id:
-                stats["nodes_created"] += 1
-
-                evidence = {
-                    "file": f"procs/{proc_name}.procs",
-                    "line_no": None,
-                    "line_text": f"Referenced: {resource_path}",
-                }
-                insert_edge(
-                    conn,
-                    src=proc_node_id,
-                    dst=resource_node_id,
-                    rel_type="READS",
-                    confidence=0.7,
-                    evidence_json=json.dumps(evidence),
-                )
-                stats["edges_created"] += 1
-
     conn.commit()
     return stats
 
@@ -191,37 +91,6 @@ def _create_script_node(
         display_name=Path(script_path).name,
         canonical_path=canonical_str,
         original_path=script_path,
-        confidence=confidence,
-    )
-
-
-def _create_resource_node(
-    conn: sqlite3.Connection,
-    resource_path: str,
-    resource_type: str,
-    snapshot_path: Path,
-) -> int | None:
-    """Create a resource node (control, insert, docdef, log)."""
-    canonical, confidence = map_unix_to_snapshot(resource_path, snapshot_path)
-
-    canonical_str = str(canonical.relative_to(snapshot_path)) if canonical else None
-
-    # Determine node type
-    node_type = resource_type
-    if resource_path.endswith(".control"):
-        node_type = "control"
-    elif resource_path.endswith((".dfa", ".DFA")):
-        node_type = "docdef"
-    elif resource_path.endswith(".ins"):
-        node_type = "insert"
-
-    return insert_node(
-        conn,
-        node_type=node_type,
-        key=f"{node_type}:{Path(resource_path).name}",
-        display_name=Path(resource_path).name,
-        canonical_path=canonical_str,
-        original_path=resource_path,
         confidence=confidence,
     )
 
