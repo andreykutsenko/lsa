@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-02-24
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -16,7 +16,7 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 
 ---
 
-## Done (v0.2.0)
+## Done (v0.3.0)
 
 ### Core Commands
 - [x] `lsa scan` — index snapshot, build execution graph from .procs
@@ -50,16 +50,20 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] explain output cleanup: sections 3b/3c/3d conditional, section 6 removed, section 7 deduplicated by source
 - [x] explain `--prompt [--lang en|ru]`: AI-ready prompt with instruction + context pack + log snippet + source files
 - [x] plan --deep: AI prompt for full Papyrus flow analysis (DFA per job_sel, output artifacts, Mermaid diagram)
+- [x] plan: snapshot age warning (>7d INFO, >30d WARN)
+- [x] plan: secondary scripts discovery — CID+JobID wildcard match + call graph from RUNS scripts
+- [x] Onboarding: setup.sh, lsa_config.sh, lsa-snap.sh, lsa-workspace.sh
+- [x] explain --prompt: simplified — removed log snippet, instruction says "open FILES TO OPEN"
 
 ### Tests
-- [x] 145 tests passing (as of 2026-02-23)
+- [x] 147 tests passing (as of 2026-02-24)
 - [x] test_wrapper_noise.py
 - [x] test_message_codes.py
 - [x] test_external_signals.py
 - [x] test_context_pack.py
 - [x] test_import_codes.py
 - [x] test_incidents.py
-- [x] test_planner.py (25 tests: scoring, DFA filtering, JSON/cursor output, i18n)
+- [x] test_planner.py (27 tests: scoring, DFA filtering, JSON/cursor output, i18n, CID+JobID wildcard, call graph)
 
 ---
 
@@ -71,6 +75,9 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 3. Inserts (via artifact lookup from procs parsed_json)
 4. Control files (job-family prefix match + letter_number filter)
 5. DFA/docdef files (from control `*_format_dfa` + procs DFA tokens)
+6. Helper scripts (master/{proc_name}_* pattern)
+7. Secondary scripts (CID+JobID wildcard match)
+8. Call graph discovery (scripts called by RUNS scripts)
 
 **Scoring:** exact key (+50), title phrase match (+30), CID prefix (+15),
 has scripts/inserts/control (+10 each), has DFA (+5), keywords (+2 each).
@@ -87,6 +94,8 @@ has scripts/inserts/control (+10 each), has DFA (+5), keywords (+2 each).
 - `--all`: full details for all candidates (legacy)
 - `--json`: machine-readable JSON (schema: snapshot_root, intent, selected_bundle, other_candidates_summary)
 - `--cursor`: Markdown prompt for Cursor IDE with embedded JSON
+- `--mermaid`: Mermaid graph + ASCII call tree
+- `--deep`: AI prompt for full Papyrus flow analysis (DFA per job_sel, Mermaid)
 - `--lang en|ru`: i18n for all text output (JSON keys always English)
 
 **Verify on real snapshot:**
@@ -105,9 +114,7 @@ uv run lsa plan "$SNAP" --cid WCCU --title "Letter 14" --cursor --lang ru
 
 **Output structure:**
 1. Instruction block (role + task description + output format) — in English or Russian
-2. Full context pack (sections 1–7, filtered)
-3. Log snippet: ±50 lines around the first error signal
-4. Source file contents: up to 6 files, 200 lines each (scripts, inserts, procs)
+2. Full context pack (sections 1–7, filtered) — FILES TO OPEN includes analyzed log path
 
 **Flags:**
 - `--prompt` — activate AI prompt mode (default: plain context pack)
@@ -207,26 +214,25 @@ Strengthen case_cards as a solutions knowledge base:
 
 ## Workflow Scripts
 
-Shell scripts in `scripts/` for day-to-day work with LSA. Paths are configured via env vars — see `scripts/.env.example`.
+Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/config.yaml` (created by `setup.sh`); env vars override as fallback.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/mk_snap_and_scan.sh` | Create RHS snapshot via rsync, then run `lsa scan` + `import-codes` + `import-histories` |
-| `scripts/mk_ticket_ws.sh` | Prepare a per-ticket workspace using `lsa plan --json`: copy relevant files, generate notes |
+| `scripts/setup.sh` | One-time interactive setup: venv, `lsa` wrapper, SSH config, `~/.lsa/config.yaml` |
+| `scripts/lsa_config.sh` | Config loader — sourced by other scripts, parses `~/.lsa/config.yaml` |
+| `scripts/lsa-snap.sh` | Simplified snapshot: rsync + `lsa scan` (no import-codes/histories) |
+| `scripts/lsa-workspace.sh` | Simplified workspace: `lsa plan --json` → copy files |
+| `scripts/mk_snap_and_scan.sh` | Full snapshot: rsync + scan + import-codes + import-histories |
+| `scripts/mk_ticket_ws.sh` | Full workspace: per-ticket structure, SSH copy mode, pull script, notes |
 
-**Env vars** (add to `~/.bashrc`):
+**Quick start:**
 ```bash
-export SNAPROOT="/path/to/rhs_snapshot_project"
-export WORKROOT="/path/to/ticket_workspaces"
-export RHS_HOST="rhs"
-```
-
-**Typical flow:**
-```bash
-mk_snap_and_scan.sh              # 1. fresh snapshot + indexed DB
-mk_ticket_ws.sh SD2-774 \        # 2. workspace for a ticket
-  --snap "$SNAP" --cid WCCU \
-  --title "Letter 14" --ssh-copy
+./scripts/setup.sh                    # 1. one-time setup
+source ~/.bashrc
+lsa-snap.sh                           # 2. create snapshot
+lsa plan $SNAP --title mocume2         # 3. view bundle
+lsa plan $SNAP --title mocume2 --deep  # 4. AI prompt + diagram
+lsa-workspace.sh --snap $SNAP --title mocume2  # 5. copy files for CR
 ```
 
 ---

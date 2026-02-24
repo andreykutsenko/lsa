@@ -13,6 +13,8 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..graph.call_parser import find_script_calls
+
 
 # ── Data structures ──────────────────────────────────────────────────────────
 
@@ -420,19 +422,67 @@ def build_bundle(
         for code in procs_dfa_codes:
             _resolve_dfa(conn, code, "procs_dfa_token", candidate, seen_dfa_paths)
 
+    # ── Dedup set for remaining steps
+    seen_paths: set[str] = {f.path for f in candidate.files}
+
     # 6. Helper scripts in master/ matching proc_name prefix (e.g. idcumv1_*.pl/py/sh)
-    existing_paths = {f.path for f in candidate.files}
     helper_rows = conn.execute(
         "SELECT path FROM artifacts WHERE kind = 'script' AND path LIKE ?",
         (f"master/{candidate.proc_name}_%",),
     ).fetchall()
     for row in helper_rows:
-        if row["path"] not in existing_paths:
+        if row["path"] not in seen_paths:
+            seen_paths.add(row["path"])
             candidate.files.append(BundleFile(
                 path=row["path"],
                 kind="script",
                 source="helper_prefix_match",
             ))
+
+    # 7. Secondary scripts — CID+JobID wildcard match
+    if intent.cid and intent.job_id:
+        cidjob = f"{intent.cid}{intent.job_id}"
+        cidjob_rows = conn.execute(
+            "SELECT path FROM artifacts WHERE kind = 'script' AND path LIKE ?",
+            (f"%{cidjob}%",),
+        ).fetchall()
+        for row in cidjob_rows:
+            if row["path"] not in seen_paths:
+                seen_paths.add(row["path"])
+                candidate.files.append(BundleFile(
+                    path=row["path"],
+                    kind="script",
+                    source="cidjob_wildcard_match",
+                ))
+
+    # 8. Call graph discovery — scripts called by RUNS scripts
+    all_scripts = conn.execute(
+        "SELECT path FROM artifacts WHERE kind = 'script'"
+    ).fetchall()
+    known_basenames = {Path(row["path"]).name for row in all_scripts}
+
+    runs_scripts = [f for f in candidate.files if f.source == "RUNS_edge"]
+    for bundle_file in runs_scripts:
+        script_path = snapshot_path / bundle_file.path
+        if not script_path.exists():
+            continue
+        try:
+            content = script_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        called = find_script_calls(content, known_basenames)
+        for basename in called:
+            art = conn.execute(
+                "SELECT path FROM artifacts WHERE kind = 'script' AND path LIKE ?",
+                (f"%/{basename}",),
+            ).fetchone()
+            if art and art["path"] not in seen_paths:
+                seen_paths.add(art["path"])
+                candidate.files.append(BundleFile(
+                    path=art["path"],
+                    kind="script",
+                    source="call_graph_discovery",
+                ))
 
 
 # ── Title phrase extraction ───────────────────────────────────────────────────

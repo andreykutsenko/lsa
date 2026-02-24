@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load config from ~/.lsa/config.yaml (if available)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$SCRIPT_DIR/lsa_config.sh" ]]; then
+    source "$SCRIPT_DIR/lsa_config.sh"
+fi
+
 # -----------------------------------------------------------------------------
 # mk_snap_and_scan.sh
 #
@@ -23,8 +29,8 @@ set -euo pipefail
 # -----------------------------
 # Config (override via env vars)
 # -----------------------------
-RHS_HOST="${RHS_HOST:-rhs}"  # ssh alias/host
-SNAPROOT="${SNAPROOT:-/mnt/c/Users/akutsenko/code/rhs_snapshot_project}"
+RHS_HOST="${RHS_HOST:-rhs}"
+SNAPROOT="${SNAPROOT:-$HOME/snapshots}"
 
 # One shared PDF for all snapshots (but DB is per-snapshot, so we import per snapshot).
 PDF_CODES_DEFAULT="${PDF_CODES_DEFAULT:-$SNAPROOT/refs/papyrus/Papyrus_DocExec_message_codes.pdf}"
@@ -126,9 +132,12 @@ done
 mkdir -p "$SNAPROOT"
 
 if [[ -z "${VIRTUAL_ENV:-}" ]]; then
-  echo "[WARN] VIRTUAL_ENV is not set (venv not activated)."
-  echo "       Recommended:"
-  echo "         cd /mnt/c/Users/akutsenko/code/lsa_project && source .venv/bin/activate"
+  VENV_DIR="$SCRIPT_DIR/../.venv"
+  if [[ -f "$VENV_DIR/bin/activate" ]]; then
+    source "$VENV_DIR/bin/activate"
+  else
+    echo "[WARN] No venv found. Run ./scripts/setup.sh first."
+  fi
 fi
 
 command -v rsync >/dev/null || { echo "[ERR] rsync not found"; exit 1; }
@@ -136,8 +145,9 @@ command -v ssh   >/dev/null || { echo "[ERR] ssh not found"; exit 1; }
 command -v python >/dev/null || { echo "[ERR] python not found"; exit 1; }
 
 # Quick check RHS connectivity
-ssh -o BatchMode=yes -o ConnectTimeout=5 "$RHS_HOST" "true" >/dev/null 2>&1 || {
-  echo "[ERR] Can't SSH to '$RHS_HOST'. Check ssh config/alias."
+SSH_TARGET="${SSH_TARGET:-$RHS_HOST}"
+ssh -o BatchMode=yes -o ConnectTimeout=5 "$SSH_TARGET" "true" >/dev/null 2>&1 || {
+  echo "[ERR] Can't SSH to '$SSH_TARGET'. Check config or run ./scripts/setup.sh."
   exit 1
 }
 
@@ -165,7 +175,7 @@ rsync "${RSYNC_COMMON[@]}" \
   --include='*/' \
   --include='*.sh' --include='*.bash' --include='*.py' --include='*.pl' --include='*.pm' \
   --exclude='*' \
-  "$RHS_HOST:/home/master/" "$SNAP/master/"
+  "$SSH_TARGET:/home/master/" "$SNAP/master/"
 
 # -----------------------------
 # Copy procs (ONLY *.procs, exclude backup)
@@ -173,7 +183,7 @@ rsync "${RSYNC_COMMON[@]}" \
 rsync "${RSYNC_COMMON[@]}" \
   --exclude='**/backup/**' \
   --include='*/' --include='*.procs' --exclude='*' \
-  "$RHS_HOST:/home/procs/" "$SNAP/procs/"
+  "$SSH_TARGET:/home/procs/" "$SNAP/procs/"
 
 # -----------------------------
 # Copy control (safe-ish: max 5MB, exclude binaries)
@@ -182,7 +192,7 @@ rsync "${RSYNC_COMMON[@]}" \
   --max-size=5m \
   --exclude='**/*.tif' --exclude='**/*.tiff' --exclude='**/*.pdf' \
   --exclude='**/*.zip' --exclude='**/*.gz' --exclude='**/*.tar' \
-  "$RHS_HOST:/home/control/" "$SNAP/control/"
+  "$SSH_TARGET:/home/control/" "$SNAP/control/"
 
 # -----------------------------
 # Copy insert (safe-ish: max 5MB, exclude binaries)
@@ -191,14 +201,14 @@ rsync "${RSYNC_COMMON[@]}" \
   --max-size=5m \
   --exclude='**/*.tif' --exclude='**/*.tiff' --exclude='**/*.pdf' \
   --exclude='**/*.zip' --exclude='**/*.gz' --exclude='**/*.tar' \
-  "$RHS_HOST:/home/insert/" "$SNAP/insert/"
+  "$SSH_TARGET:/home/insert/" "$SNAP/insert/"
 
 # -----------------------------
 # Copy docdef (ONLY *.dfa*)
 # -----------------------------
 rsync "${RSYNC_COMMON[@]}" \
   --include='*/' --include='*.dfa*' --exclude='*' \
-  "$RHS_HOST:/home/isis/docdef/" "$SNAP/docdef/"
+  "$SSH_TARGET:/home/isis/docdef/" "$SNAP/docdef/"
 
 # -----------------------------
 # Minimal "copied OK" summary (no manifests)

@@ -577,3 +577,92 @@ class TestDefaultOutputFormat:
         output = format_plan_output(intent, candidates, tmp_path, lang="ru")
         assert "ВЫБРАННЫЙ ПАКЕТ" in output
         assert "РАЗОБРАННОЕ НАМЕРЕНИЕ" in output
+
+
+class TestCidJobWildcardMatch:
+    """Test that scripts with CID+JobID in path are discovered."""
+
+    def test_cidjob_wildcard_finds_scripts(self, tmp_path):
+        """Script with CID+JobID in middle of filename should be found."""
+        db_path = _setup_db(tmp_path)
+
+        with get_connection(db_path) as conn:
+            insert_node(conn, "proc", "proc:wccuds1", "WCCU - Papyrus",
+                        canonical_path="procs/wccuds1.procs")
+
+            # Script with cid+jobid embedded in name
+            insert_artifact(conn, kind="script",
+                            path="master/run_wccuds1_report.sh",
+                            mtime=0.0, size=100)
+
+            intent, candidates = generate_plan(
+                conn,
+                snapshot_path=tmp_path,
+                cid="WCCU",
+                job_id="ds1",
+            )
+
+            assert len(candidates) >= 1
+            top = candidates[0]
+            script_paths = [f.path for f in top.files if f.kind == "script"]
+            assert "master/run_wccuds1_report.sh" in script_paths
+            # Verify source tag
+            matching = [f for f in top.files if f.path == "master/run_wccuds1_report.sh"]
+            assert matching[0].source == "cidjob_wildcard_match"
+
+
+class TestCallGraphDiscovery:
+    """Test that scripts called by RUNS scripts are discovered."""
+
+    def test_call_graph_discovery(self, tmp_path):
+        """RUNS script that calls another known script should add it to bundle."""
+        db_path = _setup_db(tmp_path)
+
+        # Create the caller script file on disk
+        master_dir = tmp_path / "master"
+        master_dir.mkdir()
+        caller_script = master_dir / "wccuds1.sh"
+        caller_script.write_text("#!/bin/bash\n./common_utils.sh\nexit 0\n")
+
+        with get_connection(db_path) as conn:
+            insert_node(conn, "proc", "proc:wccuds1", "WCCU - Papyrus",
+                        canonical_path="procs/wccuds1.procs")
+
+            # The proc node
+            proc_node = conn.execute(
+                "SELECT id FROM nodes WHERE key = 'proc:wccuds1'"
+            ).fetchone()
+
+            # Script node (the RUNS target)
+            insert_node(conn, "script", "script:wccuds1.sh", "wccuds1.sh",
+                        canonical_path="master/wccuds1.sh")
+            script_node = conn.execute(
+                "SELECT id FROM nodes WHERE key = 'script:wccuds1.sh'"
+            ).fetchone()
+
+            # RUNS edge: proc → script
+            insert_edge(conn, src=proc_node["id"], dst=script_node["id"],
+                        rel_type="RUNS")
+
+            # Both scripts as artifacts
+            insert_artifact(conn, kind="script",
+                            path="master/wccuds1.sh",
+                            mtime=0.0, size=100)
+            insert_artifact(conn, kind="script",
+                            path="master/common_utils.sh",
+                            mtime=0.0, size=200)
+
+            intent, candidates = generate_plan(
+                conn,
+                snapshot_path=tmp_path,
+                cid="WCCU",
+                job_id="ds1",
+            )
+
+            assert len(candidates) >= 1
+            top = candidates[0]
+            script_paths = [f.path for f in top.files if f.kind == "script"]
+            assert "master/common_utils.sh" in script_paths
+            # Verify source tag
+            matching = [f for f in top.files if f.path == "master/common_utils.sh"]
+            assert matching[0].source == "call_graph_discovery"

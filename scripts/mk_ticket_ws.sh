@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load config from ~/.lsa/config.yaml (if available)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$SCRIPT_DIR/lsa_config.sh" ]]; then
+    source "$SCRIPT_DIR/lsa_config.sh"
+fi
+
 # mk_ticket_ws.sh
 # Create a ticket workspace and pull relevant files (from snapshot or via SSH) based on `lsa plan --json`.
 #
@@ -33,15 +39,14 @@ Options:
   --ssh-copy          Alias for --mode ssh
   --rhs-host HOST     SSH host/alias for remote copy (default: rhs)
   --rhs HOST          Alias for --rhs-host
-  --root DIR          Override workspace root directory (default: \$WORKROOT or $WORKROOT_DEFAULT)
+  --root DIR          Override workspace root directory (default: \$WORKROOT or ~/workspaces)
   -h, --help          Show this help and exit
 EOF
 }
 
-WORKROOT_DEFAULT="/mnt/c/Users/akutsenko/Documents/1.IS/TEST"
-WORKROOT="${WORKROOT:-$WORKROOT_DEFAULT}"
+WORKROOT="${WORKROOT:-$HOME/workspaces}"
 MODE="snap"        # snap | ssh
-RHS_HOST="rhs"     # ssh alias/host
+RHS_HOST="${RHS_HOST:-rhs}"
 CID=""
 TITLE=""
 SNAP=""
@@ -85,9 +90,13 @@ fi
 
 # Precondition checks
 if [[ -z "${VIRTUAL_ENV:-}" ]]; then
-  echo "[ERR] No active virtual environment. Activate the venv first:"
-  echo "      source /path/to/venv/bin/activate"
-  exit 1
+  VENV_DIR="$SCRIPT_DIR/../.venv"
+  if [[ -f "$VENV_DIR/bin/activate" ]]; then
+    source "$VENV_DIR/bin/activate"
+  else
+    echo "[ERR] No venv found. Run ./scripts/setup.sh first."
+    exit 1
+  fi
 fi
 
 command -v rsync >/dev/null || { echo "[ERR] rsync not found (install rsync first)"; exit 1; }
