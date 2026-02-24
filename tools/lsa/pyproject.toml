@@ -1,6 +1,6 @@
 [project]
 name = "lsa"
-version = "0.2.0"
+version = "0.3.0"
 description = "Legacy Script Archaeologist - analyze legacy script snapshots"
 requires-python = ">=3.11"
 dependencies = [

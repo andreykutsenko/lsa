@@ -1,6 +1,7 @@
 """CLI entry point for LSA."""
 
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -930,6 +931,14 @@ def plan(
     if not db_path.exists():
         console.print(f"[red]Error:[/red] Database not found. Run 'lsa scan' first.")
         raise typer.Exit(1)
+
+    # Snapshot age warning
+    db_mtime = db_path.stat().st_mtime
+    age_days = int((time.time() - db_mtime) / 86400)
+    if age_days > 30:
+        console.print(f"[yellow][WARN] Snapshot is {age_days} days old — may be outdated.[/yellow]")
+    elif age_days > 7:
+        console.print(f"[dim][INFO] Snapshot is {age_days} days old. Run lsa-snap.sh if production was updated.[/dim]")
 
     if not cid and not jobid and not title:
         console.print("[red]Error:[/red] Provide at least --cid, --jobid, or --title.")

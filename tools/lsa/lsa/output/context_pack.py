@@ -283,11 +283,10 @@ def generate_context_pack(
     lines.append("-" * 40)
     lines.append("5. FILES TO OPEN")
     lines.append("-" * 40)
+    lines.append(f"  {log_path}  # analyzed log")
     if related_files:
         for f in related_files[:8]:
             lines.append(f"  {f}")
-    else:
-        lines.append("NOT FOUND in snapshot")
     lines.append("")
 
     lines.append("=" * 60)
