@@ -69,11 +69,11 @@ uv sync --project "$PROJECT_ROOT/tools/lsa"
 info "LSA synced."
 
 # -----------------------------------------------------------------------------
-# Step 2: Interactive config collection
+# Step 2: SSH credentials for RHS server
 # -----------------------------------------------------------------------------
-section "--- LSA Configuration ---"
-echo "Enter your RHS server connection details."
-echo "Press Enter to accept defaults shown in brackets."
+section "--- Step 2: RHS server credentials ---"
+echo "LSA connects to the RHS server to create snapshots."
+echo "Press Enter to accept defaults shown in [brackets]."
 echo
 
 read -rp "RHS hostname (e.g. linux-server.company.com): " rhs_host
@@ -88,57 +88,38 @@ while [[ -z "$rhs_user" ]]; do
   read -rp "SSH username: " rhs_user
 done
 
-read -rp "SSH authentication [password/key] (default: password): " ssh_auth
-ssh_auth="${ssh_auth:-password}"
-# Normalize to lowercase and validate
-ssh_auth="$(echo "$ssh_auth" | tr '[:upper:]' '[:lower:]')"
-if [[ "$ssh_auth" != "password" && "$ssh_auth" != "key" ]]; then
-  warn "Unrecognized auth type '$ssh_auth', defaulting to 'password'."
-  ssh_auth="password"
+read -rsp "SSH password: " rhs_pass
+echo
+while [[ -z "$rhs_pass" ]]; do
+  warn "Password cannot be empty."
+  read -rsp "SSH password: " rhs_pass
+  echo
+done
+
+ssh_auth="password"
+
+if ! command -v sshpass >/dev/null 2>&1; then
+  warn "sshpass not found — password auth will not work."
+  echo "       Install it:  sudo apt install sshpass"
 fi
 
-# ---------- Password auth ----------
-if [[ "$ssh_auth" == "password" ]]; then
-  read -rsp "RHS password (will be stored in ~/.lsa/.rhs_pass): " rhs_pass
-  echo
+mkdir -p "$HOME/.lsa"
+echo "$rhs_pass" > "$HOME/.lsa/.rhs_pass"
+chmod 600 "$HOME/.lsa/.rhs_pass"
+info "Password saved to ~/.lsa/.rhs_pass (mode 600)."
 
-  if ! command -v sshpass >/dev/null 2>&1; then
-    warn "sshpass not found — password auth will not work."
-    echo "       Install it first:"
-    echo "         Ubuntu/Debian:  sudo apt install sshpass"
-    echo "         macOS:          brew install hudochenkov/sshpass/sshpass"
-  fi
-
-  mkdir -p "$HOME/.lsa"
-  echo "$rhs_pass" > "$HOME/.lsa/.rhs_pass"
-  chmod 600 "$HOME/.lsa/.rhs_pass"
-  info "Password stored in ~/.lsa/.rhs_pass (mode 600)."
-
-  info "Testing SSH connection to $rhs_user@$rhs_host ..."
-  if command -v sshpass >/dev/null 2>&1; then
-    if sshpass -f "$HOME/.lsa/.rhs_pass" ssh \
-        -o StrictHostKeyChecking=accept-new \
-        -o ConnectTimeout=10 \
-        "$rhs_user@$rhs_host" "echo OK" >/dev/null 2>&1; then
-      info "SSH connection: OK"
-    else
-      warn "SSH connection test failed. Check hostname, username, and password."
-      warn "You can re-run setup.sh after fixing the issue."
-    fi
-  else
-    warn "Skipping SSH test (sshpass not installed)."
-  fi
-
-# ---------- Key auth ----------
-else
-  info "Testing SSH connection to $rhs_user@$rhs_host (key auth) ..."
-  if ssh -o BatchMode=yes -o ConnectTimeout=5 "$rhs_user@$rhs_host" "echo OK" >/dev/null 2>&1; then
+info "Testing SSH connection to $rhs_user@$rhs_host ..."
+if command -v sshpass >/dev/null 2>&1; then
+  if sshpass -f "$HOME/.lsa/.rhs_pass" ssh \
+      -o StrictHostKeyChecking=accept-new \
+      -o ConnectTimeout=10 \
+      "$rhs_user@$rhs_host" "echo OK" >/dev/null 2>&1; then
     info "SSH connection: OK"
   else
-    warn "SSH key connection test failed."
-    warn "Make sure your key is loaded (ssh-add) or configured in ~/.ssh/config."
-    warn "Continuing setup — you can fix this later."
+    warn "SSH connection test failed. Check credentials or re-run setup.sh later."
   fi
+else
+  warn "Skipping SSH test (sshpass not installed)."
 fi
 
 # ---------- Directories ----------
