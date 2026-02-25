@@ -9,12 +9,10 @@ set -euo pipefail
 #   bash scripts/setup.sh
 #
 # What it does:
-#   1. Checks Python 3.11+
-#   2. Creates .venv and installs LSA in editable mode
-#   3. Writes ~/.local/bin/lsa wrapper
-#   4. Collects RHS connection config interactively
-#   5. Writes ~/.lsa/config.yaml
-#   6. Optionally updates ~/.bashrc PATH
+#   1. Installs UV (if needed) and syncs LSA dependencies
+#   2. Collects RHS connection config interactively
+#   3. Writes ~/.lsa/config.yaml
+#   4. Adds lsa() shell function and scripts to PATH
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
@@ -53,72 +51,25 @@ section() { echo; echo "${BOLD}${CYAN}$*${RESET}"; }
 trap 'echo; warn "Setup interrupted. You can re-run scripts/setup.sh at any time."; exit 130' INT
 
 # -----------------------------------------------------------------------------
-# Step 1: Python 3.11+ check
+# Step 1: Install UV and sync dependencies
 # -----------------------------------------------------------------------------
-section "--- Step 1: Checking Python version ---"
+section "--- Step 1: Installing UV and syncing LSA ---"
 
-if ! command -v python3 >/dev/null 2>&1; then
-  error "python3 not found."
-  echo "  Install it first:"
-  echo "    Ubuntu/Debian:  sudo apt install python3.11"
-  echo "    macOS:          brew install python@3.11"
-  exit 1
+if ! command -v uv >/dev/null 2>&1; then
+  info "Installing UV package manager..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$PATH"
 fi
 
-py_version="$(python3 --version 2>&1 | sed 's/Python //')"
-py_major="$(echo "$py_version" | cut -d. -f1)"
-py_minor="$(echo "$py_version" | cut -d. -f2)"
+info "UV found: $(uv --version)"
 
-if [[ "$py_major" -lt 3 ]] || { [[ "$py_major" -eq 3 ]] && [[ "$py_minor" -lt 11 ]]; }; then
-  error "Python 3.11+ required, found $py_version."
-  echo "  Install a newer version:"
-  echo "    Ubuntu/Debian:  sudo apt install python3.11"
-  echo "    macOS:          brew install python@3.11"
-  exit 1
-fi
+info "Syncing LSA dependencies (UV handles Python + venv + deps)..."
+uv sync --project "$PROJECT_ROOT/tools/lsa"
 
-info "Python $py_version — OK"
+info "LSA synced."
 
 # -----------------------------------------------------------------------------
-# Step 2: Create venv and install LSA
-# -----------------------------------------------------------------------------
-section "--- Step 2: Creating virtualenv and installing LSA ---"
-
-venv_dir="$PROJECT_ROOT/.venv"
-
-if [[ -d "$venv_dir" ]]; then
-  info "Virtualenv already exists at $venv_dir — skipping creation."
-else
-  info "Creating virtualenv at $venv_dir ..."
-  python3 -m venv "$venv_dir"
-fi
-
-info "Upgrading pip ..."
-"$venv_dir/bin/pip" install --upgrade pip --quiet
-
-info "Installing LSA in editable mode from $PROJECT_ROOT/tools/lsa ..."
-"$venv_dir/bin/pip" install -e "$PROJECT_ROOT/tools/lsa" --quiet
-
-info "LSA installed."
-
-# -----------------------------------------------------------------------------
-# Step 3: Write ~/.local/bin/lsa wrapper
-# -----------------------------------------------------------------------------
-section "--- Step 3: Creating ~/.local/bin/lsa wrapper ---"
-
-mkdir -p "$HOME/.local/bin"
-wrapper="$HOME/.local/bin/lsa"
-
-cat > "$wrapper" <<WRAPPER
-#!/bin/bash
-exec "$venv_dir/bin/python" -m lsa.cli "\$@"
-WRAPPER
-
-chmod +x "$wrapper"
-info "Wrapper written: $wrapper"
-
-# -----------------------------------------------------------------------------
-# Step 4: Interactive config collection
+# Step 2: Interactive config collection
 # -----------------------------------------------------------------------------
 section "--- LSA Configuration ---"
 echo "Enter your RHS server connection details."
@@ -202,9 +153,9 @@ workroot="${workroot_input:-$HOME/workspaces}"
 workroot="${workroot/#\~/$HOME}"
 
 # -----------------------------------------------------------------------------
-# Step 5: Write ~/.lsa/config.yaml
+# Step 3: Write ~/.lsa/config.yaml
 # -----------------------------------------------------------------------------
-section "--- Step 5: Writing ~/.lsa/config.yaml ---"
+section "--- Step 3: Writing ~/.lsa/config.yaml ---"
 
 mkdir -p "$HOME/.lsa"
 config_file="$HOME/.lsa/config.yaml"
@@ -221,26 +172,22 @@ chmod 600 "$config_file"
 info "Config written: $config_file"
 
 # -----------------------------------------------------------------------------
-# Step 6: PATH updates in ~/.bashrc
+# Step 5: Shell function and PATH updates
 # -----------------------------------------------------------------------------
-section "--- Step 6: Updating PATH ---"
+section "--- Step 5: Shell function and PATH ---"
 
 bashrc="$HOME/.bashrc"
 
-# ~/.local/bin
-if echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin"; then
-  info "~/.local/bin is already in PATH — skipping."
+# lsa shell function (replaces old ~/.local/bin/lsa wrapper)
+if ! grep -q 'lsa()' "$bashrc" 2>/dev/null; then
+  cat >> "$bashrc" <<FUNC
+
+# LSA command (added by setup.sh)
+lsa() { uv run --project "$PROJECT_ROOT/tools/lsa" lsa "\$@"; }
+FUNC
+  info "Added lsa() shell function to $bashrc"
 else
-  read -rp "Add ~/.local/bin to PATH in ~/.bashrc? [Y/n]: " add_local_bin
-  add_local_bin="${add_local_bin:-Y}"
-  if [[ "$add_local_bin" =~ ^[Yy]$ ]]; then
-    echo '' >> "$bashrc"
-    echo '# Added by lsa setup.sh' >> "$bashrc"
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$bashrc"
-    info "Added ~/.local/bin to PATH in $bashrc"
-  else
-    info "Skipped ~/.local/bin PATH update."
-  fi
+  info "lsa() shell function already in $bashrc — skipping."
 fi
 
 # $PROJECT_ROOT/scripts
@@ -251,7 +198,6 @@ else
   read -rp "Add $scripts_dir to PATH in ~/.bashrc? [Y/n]: " add_scripts
   add_scripts="${add_scripts:-Y}"
   if [[ "$add_scripts" =~ ^[Yy]$ ]]; then
-    # Avoid duplicate comment if we already wrote it above
     if ! grep -q "Added by lsa setup.sh" "$bashrc" 2>/dev/null; then
       echo '' >> "$bashrc"
       echo '# Added by lsa setup.sh' >> "$bashrc"
@@ -264,13 +210,12 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# Step 7: Summary
+# Step 6: Summary
 # -----------------------------------------------------------------------------
 section "--- Setup complete ---"
 echo
 echo "  ${BOLD}Config:${RESET}   $config_file"
-echo "  ${BOLD}Wrapper:${RESET}  $wrapper"
-echo "  ${BOLD}Venv:${RESET}     $venv_dir"
+echo "  ${BOLD}Project:${RESET}  $PROJECT_ROOT/tools/lsa"
 echo
 echo "Next steps:"
 echo "  1. Reload your shell:"
@@ -280,4 +225,4 @@ echo "  2. Verify the install:"
 echo "       lsa --help"
 echo
 echo "  3. Create your first snapshot:"
-echo "       ./scripts/mk_snap_and_scan.sh"
+echo "       ./scripts/lsa-snap.sh"

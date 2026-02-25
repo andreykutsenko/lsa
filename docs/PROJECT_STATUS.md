@@ -180,9 +180,9 @@ Strengthen case_cards as a solutions knowledge base:
 
 ## Known Issues
 
-1. **Old `lsa` entrypoint** — if `lsa` shows old behavior, run:
+1. **Old `lsa` entrypoint** — if `lsa` shows old behavior, re-sync:
    ```bash
-   pip install -e ./tools/lsa
+   uv sync --project tools/lsa
    ```
 
 2. **Schema changes** — after updating LSA, may need to re-scan:
@@ -218,7 +218,7 @@ Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/con
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/setup.sh` | One-time interactive setup: venv, `lsa` wrapper, SSH config, `~/.lsa/config.yaml` |
+| `scripts/setup.sh` | One-time interactive setup: UV install, `uv sync`, `lsa` shell function, SSH config, `~/.lsa/config.yaml` |
 | `scripts/lsa_config.sh` | Config loader — sourced by other scripts, parses `~/.lsa/config.yaml` |
 | `scripts/lsa-snap.sh` | Simplified snapshot: rsync + `lsa scan` (no import-codes/histories) |
 | `scripts/lsa-workspace.sh` | Simplified workspace: `lsa plan --json` → copy files |
