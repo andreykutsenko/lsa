@@ -10,7 +10,7 @@ set -euo pipefail
 #
 # What it does:
 #   1. Installs UV (if needed) and syncs LSA dependencies
-#   2. Collects RHS credentials (hostname, username, password)
+#   2. Configures SSH key auth for RHS server (~/.ssh/config)
 #   3. Writes ~/.lsa/config.yaml
 # -----------------------------------------------------------------------------
 
@@ -68,14 +68,13 @@ uv sync --project "$PROJECT_ROOT/tools/lsa"
 info "LSA synced."
 
 # -----------------------------------------------------------------------------
-# Step 2: SSH credentials for RHS server
+# Step 2: SSH key auth for RHS server
 # -----------------------------------------------------------------------------
-section "--- Step 2: RHS server credentials ---"
+section "--- Step 2: RHS server SSH key auth ---"
 echo "LSA connects to the RHS server to create snapshots."
-echo "Press Enter to accept defaults shown in [brackets]."
 echo
 
-read -rp "RHS hostname (e.g. linux-server.company.com): " rhs_host
+read -rp "RHS hostname (e.g. ca-isis-pr-04.infoimageinc.com): " rhs_host
 while [[ -z "$rhs_host" ]]; do
   warn "Hostname cannot be empty."
   read -rp "RHS hostname: " rhs_host
@@ -87,38 +86,54 @@ while [[ -z "$rhs_user" ]]; do
   read -rp "SSH username: " rhs_user
 done
 
-read -rsp "SSH password: " rhs_pass
-echo
-while [[ -z "$rhs_pass" ]]; do
-  warn "Password cannot be empty."
-  read -rsp "SSH password: " rhs_pass
-  echo
+read -rp "Path to SSH private key (e.g. ~/.ssh/id_rsa): " key_path
+while [[ -z "$key_path" ]]; do
+  warn "Key path cannot be empty."
+  read -rp "Path to SSH private key: " key_path
 done
 
-ssh_auth="password"
+key_path="${key_path/#\~/$HOME}"
 
-if ! command -v sshpass >/dev/null 2>&1; then
-  warn "sshpass not found — password auth will not work."
-  echo "       Install it:  sudo apt install sshpass"
+if [[ ! -f "$key_path" ]]; then
+  error "Key file not found: $key_path"
+  exit 1
 fi
 
-mkdir -p "$HOME/.lsa"
-echo "$rhs_pass" > "$HOME/.lsa/.rhs_pass"
-chmod 600 "$HOME/.lsa/.rhs_pass"
-info "Password saved to ~/.lsa/.rhs_pass (mode 600)."
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
 
-info "Testing SSH connection to $rhs_user@$rhs_host ..."
-if command -v sshpass >/dev/null 2>&1; then
-  if sshpass -f "$HOME/.lsa/.rhs_pass" ssh \
-      -o StrictHostKeyChecking=accept-new \
-      -o ConnectTimeout=10 \
-      "$rhs_user@$rhs_host" "echo OK" >/dev/null 2>&1; then
-    info "SSH connection: OK"
-  else
-    warn "SSH connection test failed. Check credentials or re-run setup.sh later."
-  fi
+if [[ "$key_path" != "$HOME/.ssh/"* ]]; then
+  cp "$key_path" "$HOME/.ssh/lsa_rhs_key"
+  chmod 600 "$HOME/.ssh/lsa_rhs_key"
+  key_path="$HOME/.ssh/lsa_rhs_key"
+  info "Key copied to ~/.ssh/lsa_rhs_key"
 else
-  warn "Skipping SSH test (sshpass not installed)."
+  chmod 600 "$key_path"
+fi
+
+if ! grep -q "^Host rhs$" "$HOME/.ssh/config" 2>/dev/null; then
+cat >> "$HOME/.ssh/config" <<SSH_CONF
+
+Host rhs
+  HostName $rhs_host
+  User $rhs_user
+  IdentityFile $key_path
+  PubkeyAuthentication yes
+  StrictHostKeyChecking no
+  ServerAliveInterval 60
+  ServerAliveCountMax 5
+SSH_CONF
+  chmod 600 "$HOME/.ssh/config"
+  info "SSH config added: Host rhs -> $rhs_host"
+else
+  warn "Host rhs already exists in ~/.ssh/config — skipping."
+fi
+
+info "Testing SSH connection to rhs ..."
+if ssh -o BatchMode=yes -o ConnectTimeout=10 rhs "echo OK" >/dev/null 2>&1; then
+  info "SSH connection: OK"
+else
+  warn "SSH connection test failed. Check your key or re-run setup.sh later."
 fi
 
 # ---------- Directories ----------
@@ -143,7 +158,6 @@ config_file="$HOME/.lsa/config.yaml"
 cat > "$config_file" <<YAML
 rhs_host: "$rhs_host"
 rhs_user: "$rhs_user"
-ssh_auth: "$ssh_auth"
 snaproot: "$snaproot"
 workroot: "$workroot"
 YAML
@@ -156,12 +170,19 @@ info "Config written: $config_file"
 # -----------------------------------------------------------------------------
 section "--- Setup complete ---"
 echo
-echo "  ${BOLD}Config:${RESET}   $config_file"
-echo "  ${BOLD}Project:${RESET}  $PROJECT_ROOT/tools/lsa"
+echo "  ${BOLD}Config:${RESET}    ~/.lsa/config.yaml"
+echo "  ${BOLD}SSH:${RESET}       ~/.ssh/config (Host rhs)"
 echo
-echo "Next steps:"
-echo "  1. Create your first snapshot:"
-echo "       ./scripts/lsa-snap.sh"
+echo "  To start using LSA:"
+echo "    cd tools/lsa"
+echo "    source .venv/bin/activate"
+echo "    lsa --help"
 echo
-echo "  2. Run LSA commands via:"
-echo "       uv run --project $PROJECT_ROOT/tools/lsa lsa --help"
+echo "  To create a snapshot:"
+echo "    ./scripts/lsa-snap.sh"
+echo
+echo "  Daily usage:"
+echo "    cd tools/lsa"
+echo "    source .venv/bin/activate"
+echo "    lsa plan \$SNAP --title <keyword>"
+echo "    lsa plan \$SNAP --title <keyword> --deep"

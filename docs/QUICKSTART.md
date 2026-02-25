@@ -8,10 +8,11 @@ cd lsa_project
 ./scripts/setup.sh
 ```
 
-Setup installs:
-- [UV](https://docs.astral.sh/uv/) package manager (if not present)
-- LSA dependencies synced via `uv sync`
-- Config file `~/.lsa/config.yaml` with SSH settings
+Setup will:
+- Install [UV](https://docs.astral.sh/uv/) package manager (if not present)
+- Sync LSA dependencies
+- Configure SSH key authentication for RHS server (`~/.ssh/config`)
+- Write config to `~/.lsa/config.yaml`
 
 ## 2. Create Snapshot
 
@@ -26,22 +27,18 @@ The script will print the `SNAP=...` path. Save it for the next steps.
 
 ## 3. Daily Workflow
 
-### Look at a bundle (quick)
-
 ```bash
-uv run --project tools/lsa lsa plan $SNAP --title mocume2
-```
+cd tools/lsa
+source .venv/bin/activate
 
-### AI prompt + Mermaid diagram (deep analysis)
+# Look at a bundle (quick)
+lsa plan $SNAP --title mocume2
 
-```bash
-uv run --project tools/lsa lsa plan $SNAP --title mocume2 --deep
-```
+# AI prompt for deep analysis (saved to file)
+lsa plan $SNAP --title mocume2 --deep
 
-### Copy files for a Change Request
-
-```bash
-./scripts/lsa-workspace.sh --snap $SNAP --title mocume2
+# Copy files for a Change Request
+../../scripts/lsa-workspace.sh --snap $SNAP --title mocume2
 ```
 
 ## Cheat Sheet
@@ -50,41 +47,40 @@ uv run --project tools/lsa lsa plan $SNAP --title mocume2 --deep
 |------|---------|
 | First-time setup | `./scripts/setup.sh` |
 | Create snapshot | `./scripts/lsa-snap.sh` |
-| Find bundle by keyword | `uv run --project tools/lsa lsa plan $SNAP --title <keyword>` |
-| Find bundle by CID+JobID | `uv run --project tools/lsa lsa plan $SNAP --cid WCCU --jobid ds1` |
-| AI analysis prompt | `uv run --project tools/lsa lsa plan $SNAP --title <keyword> --deep` |
-| Mermaid diagram | `uv run --project tools/lsa lsa plan $SNAP --title <keyword> --mermaid` |
-| JSON output | `uv run --project tools/lsa lsa plan $SNAP --title <keyword> --json` |
+| Activate LSA | `cd tools/lsa && source .venv/bin/activate` |
+| Find bundle by keyword | `lsa plan $SNAP --title <keyword>` |
+| Find bundle by CID+JobID | `lsa plan $SNAP --cid WCCU --jobid ds1` |
+| AI deep analysis prompt | `lsa plan $SNAP --title <keyword> --deep` |
+| Mermaid diagram | `lsa plan $SNAP --title <keyword> --mermaid` |
+| JSON output | `lsa plan $SNAP --title <keyword> --json` |
 | Copy files to workspace | `./scripts/lsa-workspace.sh --snap $SNAP --title <keyword>` |
 | Full snapshot + import | `./scripts/mk_snap_and_scan.sh` |
 | Full workspace + SSH | `./scripts/mk_ticket_ws.sh TICKET --snap $SNAP --title "..."` |
 
 ## Troubleshooting
 
-### Running LSA commands
-
-LSA commands are run via UV:
+### Activating LSA environment
 
 ```bash
-uv run --project tools/lsa lsa --help
-uv run --project tools/lsa lsa plan $SNAP --title <keyword>
+cd tools/lsa
+source .venv/bin/activate
+lsa --help
 ```
 
-Or use the wrapper scripts directly:
+If `.venv` doesn't exist, re-run setup:
 ```bash
-./scripts/lsa-snap.sh
-./scripts/lsa-workspace.sh --snap $SNAP --title <keyword>
+./scripts/setup.sh
 ```
 
-### SSH password prompt every time
+### SSH connection issues
 
-Install `sshpass` for automatic password authentication:
+setup.sh configures `~/.ssh/config` with `Host rhs`. Test with:
 
 ```bash
-sudo apt install sshpass
+ssh rhs "echo OK"
 ```
 
-Then re-run `./scripts/setup.sh` to reconfigure.
+If it fails, check your SSH key and `~/.ssh/config` settings.
 
 ### Slow rsync
 
