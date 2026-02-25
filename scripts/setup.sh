@@ -10,9 +10,9 @@ set -euo pipefail
 #
 # What it does:
 #   1. Installs UV (if needed) and syncs LSA dependencies
-#   2. Collects RHS connection config interactively
+#   2. Collects RHS credentials (hostname, username, password)
 #   3. Writes ~/.lsa/config.yaml
-#   4. Adds lsa() shell function and scripts to PATH
+#   4. Adds lsa() shell function and scripts PATH to ~/.bashrc
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
@@ -153,9 +153,9 @@ chmod 600 "$config_file"
 info "Config written: $config_file"
 
 # -----------------------------------------------------------------------------
-# Step 5: Shell function and PATH updates
+# Step 4: Shell function and PATH
 # -----------------------------------------------------------------------------
-section "--- Step 5: Shell function and PATH ---"
+section "--- Step 4: Updating ~/.bashrc ---"
 
 bashrc="$HOME/.bashrc"
 
@@ -173,25 +173,16 @@ fi
 
 # $PROJECT_ROOT/scripts
 scripts_dir="$PROJECT_ROOT/scripts"
-if echo "$PATH" | tr ':' '\n' | grep -qx "$scripts_dir"; then
-  info "$scripts_dir is already in PATH — skipping."
-else
-  read -rp "Add $scripts_dir to PATH in ~/.bashrc? [Y/n]: " add_scripts
-  add_scripts="${add_scripts:-Y}"
-  if [[ "$add_scripts" =~ ^[Yy]$ ]]; then
-    if ! grep -q "Added by lsa setup.sh" "$bashrc" 2>/dev/null; then
-      echo '' >> "$bashrc"
-      echo '# Added by lsa setup.sh' >> "$bashrc"
-    fi
-    echo "export PATH=\"$scripts_dir:\$PATH\"" >> "$bashrc"
-    info "Added $scripts_dir to PATH in $bashrc"
-  else
-    info "Skipped scripts PATH update."
+if ! grep -q "$scripts_dir" "$bashrc" 2>/dev/null; then
+  if ! grep -q "Added by lsa setup.sh" "$bashrc" 2>/dev/null; then
+    echo '' >> "$bashrc"
+    echo '# Added by lsa setup.sh' >> "$bashrc"
   fi
+  echo "export PATH=\"$scripts_dir:\$PATH\"" >> "$bashrc"
 fi
 
 # -----------------------------------------------------------------------------
-# Step 6: Summary
+# Step 5: Summary
 # -----------------------------------------------------------------------------
 section "--- Setup complete ---"
 echo

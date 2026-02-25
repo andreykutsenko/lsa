@@ -56,6 +56,8 @@ RSYNC_COMMON=(
 
 if [[ -n "${RSYNC_RSH:-}" ]]; then
   RSYNC_COMMON+=(-e "$RSYNC_RSH")
+else
+  RSYNC_COMMON+=(-e "ssh -o StrictHostKeyChecking=accept-new")
 fi
 
 # -----------------------------
