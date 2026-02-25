@@ -9,7 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lsa_config.sh"
-UV_PROJECT="$SCRIPT_DIR/../tools/lsa"
+UV_PROJECT="$SCRIPT_DIR/.."
 
 usage() {
   cat <<EOF

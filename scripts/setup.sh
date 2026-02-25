@@ -63,7 +63,7 @@ fi
 info "UV found: $(uv --version)"
 
 info "Syncing LSA dependencies (UV handles Python + venv + deps)..."
-uv sync --project "$PROJECT_ROOT/tools/lsa"
+uv sync --project "$PROJECT_ROOT"
 
 info "LSA synced."
 
@@ -173,7 +173,6 @@ echo "  ${BOLD}Config:${RESET}    ~/.lsa/config.yaml"
 echo "  ${BOLD}SSH:${RESET}       ~/.ssh/config (Host rhs)"
 echo
 echo "  To start using LSA:"
-echo "    cd tools/lsa"
 echo "    source .venv/bin/activate"
 echo "    lsa --help"
 echo
@@ -181,7 +180,6 @@ echo "  To create a snapshot:"
 echo "    ./scripts/lsa-snap.sh"
 echo
 echo "  Daily usage:"
-echo "    cd tools/lsa"
 echo "    source .venv/bin/activate"
 echo "    lsa plan \$SNAP --title <keyword>"
 echo "    lsa plan \$SNAP --title <keyword> --deep"

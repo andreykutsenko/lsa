@@ -11,7 +11,7 @@ Use this file to restore context when starting a new Claude Code session.
 LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec batch system snapshots. It builds an execution graph, indexes files, and generates "context packs" for debugging.
 
 **Repository:** https://github.com/andreykutsenko/lsa
-**Location:** `/mnt/c/Users/akutsenko/code/lsa_project/tools/lsa`
+**Location:** `/mnt/c/Users/akutsenko/code/lsa_project`
 **Snapshots:** `/mnt/c/Users/akutsenko/code/rhs_snapshot_project/` (separate, not in git)
 
 ---
@@ -127,7 +127,7 @@ LOG="/d/daily/idcumv1/idcumv1.log"
 uv run lsa explain "$SNAP" "$LOG" --prompt --lang ru
 ```
 
-**Source:** `tools/lsa/lsa/output/prompt_pack.py`
+**Source:** `lsa/output/prompt_pack.py`
 
 ---
 
@@ -182,7 +182,7 @@ Strengthen case_cards as a solutions knowledge base:
 
 1. **Old `lsa` entrypoint** — if `lsa` shows old behavior, re-sync:
    ```bash
-   uv sync --project tools/lsa
+   uv sync
    ```
 
 2. **Schema changes** — after updating LSA, may need to re-scan:
@@ -199,16 +199,16 @@ Strengthen case_cards as a solutions knowledge base:
 
 | What | Path |
 |------|------|
-| CLI entrypoint | `tools/lsa/lsa/cli.py` |
-| Database schema | `tools/lsa/lsa/db/schema.py` |
-| External signals rules | `tools/lsa/lsa/rules/external_signals.yaml` |
-| Config (TEXT_EXTENSIONS) | `tools/lsa/lsa/config.py` |
-| Context pack generator | `tools/lsa/lsa/output/context_pack.py` |
-| Hypotheses generator | `tools/lsa/lsa/analysis/hypotheses.py` |
-| Plan/bundle logic | `tools/lsa/lsa/analysis/planner.py` |
-| Log parser | `tools/lsa/lsa/parsers/log_parser.py` |
-| PDF parser | `tools/lsa/lsa/parsers/pdf_parser.py` |
-| Tests | `tools/lsa/tests/` |
+| CLI entrypoint | `lsa/cli.py` |
+| Database schema | `lsa/db/schema.py` |
+| External signals rules | `lsa/rules/external_signals.yaml` |
+| Config (TEXT_EXTENSIONS) | `lsa/config.py` |
+| Context pack generator | `lsa/output/context_pack.py` |
+| Hypotheses generator | `lsa/analysis/hypotheses.py` |
+| Plan/bundle logic | `lsa/analysis/planner.py` |
+| Log parser | `lsa/parsers/log_parser.py` |
+| PDF parser | `lsa/parsers/pdf_parser.py` |
+| Tests | `tests/` |
 
 ---
 
@@ -229,7 +229,7 @@ Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/con
 ```bash
 ./scripts/setup.sh                                                 # 1. one-time setup
 ./scripts/lsa-snap.sh                                              # 2. create snapshot
-cd tools/lsa && source .venv/bin/activate                          # 3. activate LSA
+source .venv/bin/activate                                          # 3. activate LSA
 lsa plan $SNAP --title mocume2                                     # 4. view bundle
 lsa plan $SNAP --title mocume2 --deep                              # 5. AI prompt (saved to file)
 ./scripts/lsa-workspace.sh --snap $SNAP --title mocume2            # 6. copy files for CR
@@ -242,4 +242,4 @@ lsa plan $SNAP --title mocume2 --deep                              # 5. AI promp
 1. Read this file to restore context
 2. Check "In Progress" section for pending work
 3. Check "Planned" for next features
-4. Run tests: `cd tools/lsa && uv run pytest`
+4. Run tests: `uv run pytest`
