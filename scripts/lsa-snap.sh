@@ -20,6 +20,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lsa_config.sh"
+UV_PROJECT="$SCRIPT_DIR/../tools/lsa"
 
 # -----------------------------
 # Date and snapshot path
@@ -118,8 +119,8 @@ echo
 # Scan
 # -----------------------------
 echo "Running: lsa scan (DB -> $SNAP/.lsa/lsa.sqlite)"
-lsa scan "$SNAP"
-lsa stats "$SNAP" || true
+uv run --project "$UV_PROJECT" lsa scan "$SNAP"
+uv run --project "$UV_PROJECT" lsa stats "$SNAP" || true
 
 echo
 echo "════════════════════════════════"

@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/lsa_config.sh" ]]; then
     source "$SCRIPT_DIR/lsa_config.sh"
 fi
+UV_PROJECT="$SCRIPT_DIR/../tools/lsa"
 
 # -----------------------------------------------------------------------------
 # mk_snap_and_scan.sh
@@ -15,7 +16,7 @@ fi
 #   - optional: lsa import-codes (PDF)
 #   - optional: lsa import-histories
 #
-# Expected usage (from an activated venv where LSA is importable):
+# Expected usage (requires UV: https://docs.astral.sh/uv/):
 #   mk_snap_and_scan.sh [YYYYMMDD] [options]
 #
 # Examples:
@@ -131,18 +132,9 @@ done
 # -----------------------------
 mkdir -p "$SNAPROOT"
 
-if [[ -z "${VIRTUAL_ENV:-}" ]]; then
-  VENV_DIR="$SCRIPT_DIR/../.venv"
-  if [[ -f "$VENV_DIR/bin/activate" ]]; then
-    source "$VENV_DIR/bin/activate"
-  else
-    echo "[WARN] No venv found. Run ./scripts/setup.sh first."
-  fi
-fi
-
 command -v rsync >/dev/null || { echo "[ERR] rsync not found"; exit 1; }
 command -v ssh   >/dev/null || { echo "[ERR] ssh not found"; exit 1; }
-command -v python >/dev/null || { echo "[ERR] python not found"; exit 1; }
+command -v uv >/dev/null || { echo "[ERR] uv not found. Run ./scripts/setup.sh first."; exit 1; }
 
 # Quick check RHS connectivity
 SSH_TARGET="${SSH_TARGET:-$RHS_HOST}"
@@ -227,11 +219,10 @@ echo
 
 # -----------------------------
 # Index (scan)
-# Use python -m lsa.cli to guarantee we hit the current venv interpreter.
 # -----------------------------
 echo "Running: lsa scan (DB -> $SNAP/.lsa/lsa.sqlite)"
-python -m lsa.cli scan "$SNAP"
-python -m lsa.cli stats "$SNAP" || true
+uv run --project "$UV_PROJECT" lsa scan "$SNAP"
+uv run --project "$UV_PROJECT" lsa stats "$SNAP" || true
 
 # -----------------------------
 # Import codes from PDF
@@ -241,7 +232,7 @@ if [[ "$IMPORT_CODES" == "1" ]]; then
     echo
     echo "Importing message codes from PDF:"
     echo "  PDF=$PDF_CODES"
-    python -m lsa.cli import-codes "$SNAP" --pdf "$PDF_CODES"
+    uv run --project "$UV_PROJECT" lsa import-codes "$SNAP" --pdf "$PDF_CODES"
   else
     echo
     echo "[WARN] PDF not found, skipping import-codes:"
@@ -258,7 +249,7 @@ if [[ "$IMPORT_HISTORIES" == "1" ]]; then
     echo "Importing histories:"
     echo "  DIR=$HIST_DIR"
     echo "  GLOB=$HIST_GLOB"
-    python -m lsa.cli import-histories "$SNAP" --path "$HIST_DIR" --glob "$HIST_GLOB"
+    uv run --project "$UV_PROJECT" lsa import-histories "$SNAP" --path "$HIST_DIR" --glob "$HIST_GLOB"
   else
     echo
     echo "[WARN] Histories dir not found, skipping import-histories:"
@@ -272,4 +263,4 @@ echo
 echo "Next:"
 echo "  1) Drop a specific log here (optional): $SNAP/logs_inbox/"
 echo "  2) Run analysis:"
-echo "     python -m lsa.cli explain \"$SNAP\" --log /path/to/your.log"
+echo "     uv run --project tools/lsa lsa explain \"$SNAP\" --log /path/to/your.log"

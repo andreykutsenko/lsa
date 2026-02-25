@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/lsa_config.sh" ]]; then
     source "$SCRIPT_DIR/lsa_config.sh"
 fi
+UV_PROJECT="$SCRIPT_DIR/../tools/lsa"
 
 # mk_ticket_ws.sh
 # Create a ticket workspace and pull relevant files (from snapshot or via SSH) based on `lsa plan --json`.
@@ -89,15 +90,7 @@ if [[ "$MODE" != "snap" && "$MODE" != "ssh" ]]; then
 fi
 
 # Precondition checks
-if [[ -z "${VIRTUAL_ENV:-}" ]]; then
-  VENV_DIR="$SCRIPT_DIR/../.venv"
-  if [[ -f "$VENV_DIR/bin/activate" ]]; then
-    source "$VENV_DIR/bin/activate"
-  else
-    echo "[ERR] No venv found. Run ./scripts/setup.sh first."
-    exit 1
-  fi
-fi
+command -v uv >/dev/null || { echo "[ERR] uv not found. Run ./scripts/setup.sh first."; exit 1; }
 
 command -v rsync >/dev/null || { echo "[ERR] rsync not found (install rsync first)"; exit 1; }
 
@@ -108,9 +101,6 @@ if [[ ! -f "$SNAP/.lsa/lsa.sqlite" ]]; then
   echo "      Hint: run 'lsa scan $SNAP' to build the index first"
   exit 1
 fi
-
-command -v lsa >/dev/null || { echo "[ERR] lsa not found (activate venv first)"; exit 1; }
-command -v python >/dev/null || { echo "[ERR] python not found"; exit 1; }
 
 TS="$(date +%Y%m%d_%H%M%S)"
 WS="${WORKROOT}/${TICKET}_${TS}"
@@ -142,7 +132,7 @@ log "MODE=${MODE^^}"
 
 PLAN_JSON="$WS/logs/plan.json"
 
-cmd=(lsa plan "$SNAP" --json)
+cmd=(uv run --project "$UV_PROJECT" lsa plan "$SNAP" --json)
 [[ -n "$CID"   ]] && cmd+=(--cid "$CID")
 [[ -n "$TITLE" ]] && cmd+=(--title "$TITLE")
 [[ -n "$JOBID" ]] && cmd+=(--jobid "$JOBID")
@@ -151,7 +141,7 @@ log "Running: ${cmd[*]}"
 "${cmd[@]}" > "$PLAN_JSON"
 
 FILES_LIST="$WS/logs/files.list"
-python - <<'PY' "$PLAN_JSON" > "$FILES_LIST"
+uv run --project "$UV_PROJECT" python - <<'PY' "$PLAN_JSON" > "$FILES_LIST"
 import json, sys
 p = sys.argv[1]
 obj = json.load(open(p, 'r', encoding='utf-8'))

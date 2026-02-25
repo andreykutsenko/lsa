@@ -8,9 +8,10 @@ cd lsa_project
 ./scripts/setup.sh
 ```
 
-Setup creates:
-- Python venv with LSA installed
-- `lsa` command available globally (`~/.local/bin/lsa`)
+Setup installs:
+- [UV](https://docs.astral.sh/uv/) package manager (if not present)
+- LSA dependencies synced via `uv sync`
+- `lsa` shell function in `~/.bashrc`
 - Config file `~/.lsa/config.yaml` with SSH settings
 
 After setup, restart your shell or run `source ~/.bashrc`.
@@ -68,10 +69,10 @@ lsa plan $SNAP --title mocume2 --deep
 ```bash
 source ~/.bashrc
 # or check:
-ls ~/.local/bin/lsa
+type lsa
 ```
 
-If the wrapper is missing, re-run `./scripts/setup.sh`.
+If the function is missing, re-run `./scripts/setup.sh`.
 
 ### SSH password prompt every time
 

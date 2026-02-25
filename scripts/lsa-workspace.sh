@@ -9,6 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lsa_config.sh"
+UV_PROJECT="$SCRIPT_DIR/../tools/lsa"
 
 usage() {
   cat <<EOF
@@ -56,8 +57,7 @@ if [[ ! -f "$SNAP/.lsa/lsa.sqlite" ]]; then
   exit 1
 fi
 
-command -v lsa     >/dev/null || { echo "[ERR] lsa not found (activate venv first)"; exit 1; }
-command -v python3 >/dev/null || { echo "[ERR] python3 not found"; exit 1; }
+command -v uv >/dev/null || { echo "[ERR] uv not found. Run ./scripts/setup.sh first."; exit 1; }
 
 if [[ -z "${WORKROOT:-}" ]]; then
   echo "[ERR] WORKROOT is not set. Define it in ~/.lsa/config.yaml or export WORKROOT=..."
@@ -73,14 +73,14 @@ mkdir -p "$WS/code"
 
 PLAN_JSON="$WS/plan.json"
 
-cmd=(lsa plan "$SNAP" --json)
+cmd=(uv run --project "$UV_PROJECT" lsa plan "$SNAP" --json)
 [[ -n "$CID"   ]] && cmd+=(--cid "$CID")
 [[ -n "$JOBID" ]] && cmd+=(--jobid "$JOBID")
 [[ -n "$TITLE" ]] && cmd+=(--title "$TITLE")
 "${cmd[@]}" > "$PLAN_JSON"
 
 FILES_LIST="$WS/files.list"
-python3 -c "
+uv run --project "$UV_PROJECT" python -c "
 import json, sys
 obj = json.load(open(sys.argv[1]))
 files = (obj.get('selected_bundle') or {}).get('files') or []

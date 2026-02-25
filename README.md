@@ -79,33 +79,27 @@ snapshot_project/                # NOT in Git (see .gitignore)
 
 ## Installation
 
-**Prerequisites:** Python 3.11+, WSL recommended.
+**Prerequisites:** WSL recommended. No need to install Python — UV handles it.
 
 ```bash
 # Clone and enter repo
 git clone https://github.com/andreykutsenko/lsa.git
 cd lsa
 
-# Create venv and install
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ./tools/lsa
+# One-time setup (installs UV, syncs deps, configures SSH)
+./scripts/setup.sh
+source ~/.bashrc
 
 # Verify
-lsa --version
+lsa --help
 ```
 
 ### Dev Setup (with tests)
 
 ```bash
-# Using uv (recommended)
 cd tools/lsa
 uv sync --dev
 uv run pytest
-
-# Or pip
-pip install -e ./tools/lsa[dev]
-pytest tools/lsa/tests/
 ```
 
 ## Snapshot Workflow
@@ -130,10 +124,9 @@ rsync -avz "${1}:/home/procs/" "${SNAP_DIR}/procs/"
 # ... other directories
 
 # Index immediately
-source "$HOME/lsa/.venv/bin/activate"
-lsa scan "$SNAP_DIR"
-lsa import-codes "$SNAP_DIR"  # Auto-detects PDF
-lsa import-histories "$SNAP_DIR"  # Auto-detects histories dir
+uv run --project tools/lsa lsa scan "$SNAP_DIR"
+uv run --project tools/lsa lsa import-codes "$SNAP_DIR"
+uv run --project tools/lsa lsa import-histories "$SNAP_DIR"
 ```
 
 ### Typical Usage
@@ -305,23 +298,22 @@ This saves significant context-gathering time and focuses the AI on the actual p
 
 ### `lsa` command shows old behavior
 
-The `lsa` entrypoint might be cached or point to wrong venv.
+The shell function might be stale or the deps out of sync.
 
 ```bash
-# Check which lsa is being used
-which lsa
-head -n 1 $(which lsa)  # Check shebang
+# Re-sync dependencies
+uv sync --project tools/lsa
 
-# Reliable alternative: run as module
-python -m lsa.cli explain "$SNAP" --log file.log
+# Reload shell
+source ~/.bashrc
 
-# Reinstall to fix
-pip install -e ./tools/lsa
+# Verify
+lsa --version
 ```
 
-### When do I need `pip install -e` again?
+### When do I need to re-sync?
 
-- After modifying `pyproject.toml` (dependencies, entry points)
+- After modifying `pyproject.toml` (dependencies, entry points): `uv sync --project tools/lsa`
 - After pulling changes that modify package structure
 - NOT needed for code changes in existing files (editable install handles this)
 
@@ -366,4 +358,4 @@ Internal use only. Not for distribution.
 
 ---
 
-*LSA v0.2.0 — Legacy Script Archaeologist*
+*LSA v0.3.0 — Legacy Script Archaeologist*
