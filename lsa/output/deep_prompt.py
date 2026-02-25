@@ -13,14 +13,24 @@ Read the files listed below, then generate a Mermaid diagram showing:
 4. Key output artifacts per path (AFP files, index files, paperless, client pickup, etc.)
 5. External systems involved (ISD, InfoTrac, preprocessing servers via SSH)
 
-Output format (strictly in this order):
-1. A clickable Mermaid Live link to view the diagram:
-   https://mermaid.live/edit#pako:{{base64-encoded-diagram}}
-2. The raw Mermaid source in a ```mermaid code block (for copy-paste into other tools).
+Output:
+1. Save the diagram to: {diagrams_dir}/{proc_name}.mmd
+2. Output the raw Mermaid source in a code block (for copy-paste into mermaid.live)
 
-The diagram must start with "graph TD".
-Use subgraphs for each job_sel path. Label DocExec nodes with DFA name.
-No explanation — link and diagram only.\
+Mermaid syntax rules:
+- Diagram must start with "graph TD"
+- All node labels must be in double quotes: A["my label"]
+- No spaces around arrows: A-->B (not A --> B)
+- Subgraph titles must be in double quotes: subgraph S["title"]
+- Use subgraphs for each job_sel path
+- Label DocExec nodes with DFA name
+- The .mmd file must begin with these comment lines:
+  %% {proc_name} processing flow diagram
+  %% To view: open https://mermaid.live and paste this into the Code panel
+  %% Also works in: VS Code (ext: "Markdown Preview Mermaid Support"),
+  %%   GitHub/GitLab (renders .mmd natively), Confluence Cloud, Notion (/mermaid block)
+
+No explanation — diagram only.\
 """
 
 _INSTRUCTION_RU = """\
@@ -34,14 +44,24 @@ Job: {proc_name} ({title})
 4. Ключевые выходные артефакты (AFP, index, paperless, client pickup и т.д.)
 5. Внешние системы (ISD, InfoTrac, preprocessing серверы через SSH)
 
-Формат вывода (строго в этом порядке):
-1. Кликабельная ссылка Mermaid Live для просмотра диаграммы:
-   https://mermaid.live/edit#pako:{{base64-encoded-diagram}}
-2. Исходный код Mermaid в блоке ```mermaid (для копирования в другие инструменты).
+Вывод:
+1. Сохрани диаграмму в: {diagrams_dir}/{proc_name}.mmd
+2. Выведи исходный код Mermaid в блоке кода (для копирования в mermaid.live)
 
-Диаграмма должна начинаться с "graph TD".
-Используй subgraph для каждого пути. Помечай DocExec ноды именем DFA.
-Без пояснений — только ссылка и диаграмма.\
+Правила синтаксиса Mermaid:
+- Диаграмма начинается с "graph TD"
+- Все подписи узлов в двойных кавычках: A["подпись"]
+- Без пробелов вокруг стрелок: A-->B (не A --> B)
+- Заголовки subgraph в двойных кавычках: subgraph S["заголовок"]
+- Используй subgraph для каждого пути job_sel
+- Помечай DocExec ноды именем DFA
+- Файл .mmd должен начинаться с комментариев:
+  %% {proc_name} processing flow diagram
+  %% To view: open https://mermaid.live and paste this into the Code panel
+  %% Also works in: VS Code (ext: "Markdown Preview Mermaid Support"),
+  %%   GitHub/GitLab (renders .mmd natively), Confluence Cloud, Notion (/mermaid block)
+
+Без пояснений — только диаграмма.\
 """
 
 
@@ -51,8 +71,13 @@ def generate_deep_prompt(bundle: BundleCandidate, snapshot_path: Path, lang: str
     Provides file paths only — the AI reads what it needs directly.
     No file contents embedded; no truncation issues.
     """
+    diagrams_dir = snapshot_path / ".lsa" / "diagrams"
     instruction_tmpl = _INSTRUCTION_RU if lang == "ru" else _INSTRUCTION_EN
-    instruction = instruction_tmpl.format(proc_name=bundle.proc_name, title=bundle.display_name)
+    instruction = instruction_tmpl.format(
+        proc_name=bundle.proc_name,
+        title=bundle.display_name,
+        diagrams_dir=diagrams_dir,
+    )
 
     sep = "=" * 60
     parts: list[str] = [instruction, "", sep, "FILES TO READ", sep]
