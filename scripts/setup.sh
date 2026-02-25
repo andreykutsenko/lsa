@@ -12,7 +12,6 @@ set -euo pipefail
 #   1. Installs UV (if needed) and syncs LSA dependencies
 #   2. Collects RHS credentials (hostname, username, password)
 #   3. Writes ~/.lsa/config.yaml
-#   4. Adds lsa() shell function and scripts PATH to ~/.bashrc
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
@@ -153,36 +152,7 @@ chmod 600 "$config_file"
 info "Config written: $config_file"
 
 # -----------------------------------------------------------------------------
-# Step 4: Shell function and PATH
-# -----------------------------------------------------------------------------
-section "--- Step 4: Updating ~/.bashrc ---"
-
-bashrc="$HOME/.bashrc"
-
-# lsa shell function (replaces old ~/.local/bin/lsa wrapper)
-if ! grep -q 'lsa()' "$bashrc" 2>/dev/null; then
-  cat >> "$bashrc" <<FUNC
-
-# LSA command (added by setup.sh)
-lsa() { uv run --project "$PROJECT_ROOT/tools/lsa" lsa "\$@"; }
-FUNC
-  info "Added lsa() shell function to $bashrc"
-else
-  info "lsa() shell function already in $bashrc — skipping."
-fi
-
-# $PROJECT_ROOT/scripts
-scripts_dir="$PROJECT_ROOT/scripts"
-if ! grep -q "$scripts_dir" "$bashrc" 2>/dev/null; then
-  if ! grep -q "Added by lsa setup.sh" "$bashrc" 2>/dev/null; then
-    echo '' >> "$bashrc"
-    echo '# Added by lsa setup.sh' >> "$bashrc"
-  fi
-  echo "export PATH=\"$scripts_dir:\$PATH\"" >> "$bashrc"
-fi
-
-# -----------------------------------------------------------------------------
-# Step 5: Summary
+# Done
 # -----------------------------------------------------------------------------
 section "--- Setup complete ---"
 echo
@@ -190,11 +160,8 @@ echo "  ${BOLD}Config:${RESET}   $config_file"
 echo "  ${BOLD}Project:${RESET}  $PROJECT_ROOT/tools/lsa"
 echo
 echo "Next steps:"
-echo "  1. Reload your shell:"
-echo "       source ~/.bashrc"
-echo
-echo "  2. Verify the install:"
-echo "       lsa --help"
-echo
-echo "  3. Create your first snapshot:"
+echo "  1. Create your first snapshot:"
 echo "       ./scripts/lsa-snap.sh"
+echo
+echo "  2. Run LSA commands via:"
+echo "       uv run --project $PROJECT_ROOT/tools/lsa lsa --help"
