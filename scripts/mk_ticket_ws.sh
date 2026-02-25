@@ -48,6 +48,7 @@ EOF
 WORKROOT="${WORKROOT:-$HOME/workspaces}"
 MODE="snap"        # snap | ssh
 RHS_HOST="${RHS_HOST:-rhs}"
+RHS_USER="${RHS_USER:-}"
 CID=""
 TITLE=""
 SNAP=""
@@ -78,6 +79,8 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown arg: $1"; exit 2 ;;
   esac
 done
+
+SSH_TARGET="${RHS_USER:+$RHS_USER@}${RHS_HOST}"
 
 if [[ -z "$SNAP" ]]; then
   echo "[ERR] --snap is required"; exit 2
@@ -211,7 +214,7 @@ copy_from_ssh() {
     return 0
   fi
 
-  local src="${RHS_HOST}:${base}/${subpath}"
+  local src="${SSH_TARGET}:${base}/${subpath}"
   local dst="$WS/code/$rel"
   mkdir -p "$(dirname "$dst")"
 
@@ -238,7 +241,7 @@ cat > "$PULL_SCRIPT" <<PULL
 # Pulls files from RHS host into code/ using rsync.
 set -euo pipefail
 
-RHS_HOST="${RHS_HOST}"
+SSH_TARGET="${SSH_TARGET}"
 WS="\$(cd "\$(dirname "\$0")/.." && pwd -P)"
 FILES_LIST="\$WS/logs/files.list"
 
@@ -247,12 +250,12 @@ while IFS='|' read -r kind rel absp; do
   mkdir -p "\$(dirname "\$dst")"
 
   case "\$rel" in
-    master/*)  src="\$RHS_HOST:/home/master/\${rel#master/}" ;;
-    script/*)  src="\$RHS_HOST:/home/master/\${rel#script/}" ;;
-    procs/*)   src="\$RHS_HOST:/home/procs/\${rel#procs/}" ;;
-    control/*) src="\$RHS_HOST:/home/control/\${rel#control/}" ;;
-    insert/*)  src="\$RHS_HOST:/home/insert/\${rel#insert/}" ;;
-    docdef/*)  src="\$RHS_HOST:/home/isis/docdef/\${rel#docdef/}" ;;
+    master/*)  src="\$SSH_TARGET:/home/master/\${rel#master/}" ;;
+    script/*)  src="\$SSH_TARGET:/home/master/\${rel#script/}" ;;
+    procs/*)   src="\$SSH_TARGET:/home/procs/\${rel#procs/}" ;;
+    control/*) src="\$SSH_TARGET:/home/control/\${rel#control/}" ;;
+    insert/*)  src="\$SSH_TARGET:/home/insert/\${rel#insert/}" ;;
+    docdef/*)  src="\$SSH_TARGET:/home/isis/docdef/\${rel#docdef/}" ;;
     *)         echo "[SKIP] No remote mapping for: \$rel"; continue ;;
   esac
 
