@@ -104,12 +104,11 @@ chmod 700 "$HOME/.ssh"
 
 if [[ "$key_path" != "$HOME/.ssh/"* ]]; then
   cp "$key_path" "$HOME/.ssh/lsa_rhs_key"
-  chmod 600 "$HOME/.ssh/lsa_rhs_key"
   key_path="$HOME/.ssh/lsa_rhs_key"
   info "Key copied to ~/.ssh/lsa_rhs_key"
-else
-  chmod 600 "$key_path"
 fi
+
+chmod 600 "$key_path"
 
 if ! grep -q "^Host rhs$" "$HOME/.ssh/config" 2>/dev/null; then
 cat >> "$HOME/.ssh/config" <<SSH_CONF
