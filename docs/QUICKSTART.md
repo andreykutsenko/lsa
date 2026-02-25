@@ -28,7 +28,6 @@ The script will print the `SNAP=...` path. Save it for the next steps.
 ## 3. Daily Workflow
 
 ```bash
-cd tools/lsa
 source .venv/bin/activate
 
 # Look at a bundle (quick)
@@ -38,7 +37,7 @@ lsa plan $SNAP --title mocume2
 lsa plan $SNAP --title mocume2 --deep
 
 # Copy files for a Change Request
-../../scripts/lsa-workspace.sh --snap $SNAP --title mocume2
+./scripts/lsa-workspace.sh --snap $SNAP --title mocume2
 ```
 
 ## Cheat Sheet
@@ -47,7 +46,7 @@ lsa plan $SNAP --title mocume2 --deep
 |------|---------|
 | First-time setup | `./scripts/setup.sh` |
 | Create snapshot | `./scripts/lsa-snap.sh` |
-| Activate LSA | `cd tools/lsa && source .venv/bin/activate` |
+| Activate LSA | `source .venv/bin/activate` |
 | Find bundle by keyword | `lsa plan $SNAP --title <keyword>` |
 | Find bundle by CID+JobID | `lsa plan $SNAP --cid WCCU --jobid ds1` |
 | AI deep analysis prompt | `lsa plan $SNAP --title <keyword> --deep` |
@@ -62,7 +61,6 @@ lsa plan $SNAP --title mocume2 --deep
 ### Activating LSA environment
 
 ```bash
-cd tools/lsa
 source .venv/bin/activate
 lsa --help
 ```

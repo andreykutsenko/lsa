@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/lsa_config.sh" ]]; then
     source "$SCRIPT_DIR/lsa_config.sh"
 fi
-UV_PROJECT="$SCRIPT_DIR/../tools/lsa"
+UV_PROJECT="$SCRIPT_DIR/.."
 
 # -----------------------------------------------------------------------------
 # mk_snap_and_scan.sh
@@ -263,4 +263,4 @@ echo
 echo "Next:"
 echo "  1) Drop a specific log here (optional): $SNAP/logs_inbox/"
 echo "  2) Run analysis:"
-echo "     uv run --project tools/lsa lsa explain \"$SNAP\" --log /path/to/your.log"
+echo "     lsa explain \"$SNAP\" --log /path/to/your.log"

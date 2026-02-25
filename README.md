@@ -51,14 +51,13 @@ For detailed technical architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 
 ```
 lsa_project/                     # This repo (Git tracked)
-├── tools/lsa/                   # Python package
-│   ├── lsa/
-│   │   ├── cli.py              # Typer CLI entrypoint
-│   │   ├── db/schema.py        # SQLite tables
-│   │   ├── rules/external_signals.yaml  # Detection rules
-│   │   └── ...
-│   ├── tests/
-│   └── pyproject.toml
+├── lsa/
+│   ├── cli.py              # Typer CLI entrypoint
+│   ├── db/schema.py        # SQLite tables
+│   ├── rules/external_signals.yaml  # Detection rules
+│   └── ...
+├── tests/
+├── pyproject.toml
 ├── docs/
 │   └── ARCHITECTURE.md         # Technical deep-dive
 └── README.md
@@ -90,21 +89,18 @@ cd lsa
 ./scripts/setup.sh
 
 # Activate and verify
-cd tools/lsa
 source .venv/bin/activate
 lsa --help
 ```
 
 All `lsa` commands below assume you've activated the environment:
 ```bash
-cd tools/lsa
 source .venv/bin/activate
 ```
 
 ### Dev Setup (with tests)
 
 ```bash
-cd tools/lsa
 uv sync --dev
 source .venv/bin/activate
 pytest
@@ -310,7 +306,6 @@ Dependencies may be out of sync.
 
 ```bash
 # Re-sync dependencies
-cd tools/lsa
 uv sync
 
 # Verify
@@ -320,7 +315,7 @@ lsa --version
 
 ### When do I need to re-sync?
 
-- After modifying `pyproject.toml` (dependencies, entry points): `uv sync --project tools/lsa`
+- After modifying `pyproject.toml` (dependencies, entry points): `uv sync`
 - After pulling changes that modify package structure
 - NOT needed for code changes in existing files (editable install handles this)
 

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/lsa_config.sh" ]]; then
     source "$SCRIPT_DIR/lsa_config.sh"
 fi
-UV_PROJECT="$SCRIPT_DIR/../tools/lsa"
+UV_PROJECT="$SCRIPT_DIR/.."
 
 # mk_ticket_ws.sh
 # Create a ticket workspace and pull relevant files (from snapshot or via SSH) based on `lsa plan --json`.
