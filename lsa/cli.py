@@ -980,10 +980,10 @@ def plan(
             prompt_text = generate_deep_prompt(candidates[0], snapshot, lang=lang)
 
             parts = []
-            if intent.get("cid"):
-                parts.append(intent["cid"])
-            if intent.get("jobid"):
-                parts.append(intent["jobid"])
+            if intent.cid:
+                parts.append(intent.cid)
+            if intent.job_id:
+                parts.append(intent.job_id)
             if not parts:
                 parts.append(candidates[0].proc_name)
             parts.append(datetime.now().strftime("%Y%m%d_%H%M%S"))
