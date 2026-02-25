@@ -88,10 +88,14 @@ cd lsa
 
 # One-time setup (installs UV, syncs deps, configures SSH)
 ./scripts/setup.sh
-source ~/.bashrc
 
 # Verify
-lsa --help
+uv run --project tools/lsa lsa --help
+```
+
+All `lsa` commands below assume you run them from the project root as:
+```bash
+uv run --project tools/lsa lsa <command> [args]
 ```
 
 ### Dev Setup (with tests)
@@ -298,17 +302,14 @@ This saves significant context-gathering time and focuses the AI on the actual p
 
 ### `lsa` command shows old behavior
 
-The shell function might be stale or the deps out of sync.
+Dependencies may be out of sync.
 
 ```bash
 # Re-sync dependencies
 uv sync --project tools/lsa
 
-# Reload shell
-source ~/.bashrc
-
 # Verify
-lsa --version
+uv run --project tools/lsa lsa --version
 ```
 
 ### When do I need to re-sync?

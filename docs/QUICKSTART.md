@@ -11,10 +11,7 @@ cd lsa_project
 Setup installs:
 - [UV](https://docs.astral.sh/uv/) package manager (if not present)
 - LSA dependencies synced via `uv sync`
-- `lsa` shell function in `~/.bashrc`
 - Config file `~/.lsa/config.yaml` with SSH settings
-
-After setup, restart your shell or run `source ~/.bashrc`.
 
 ## 2. Create Snapshot
 
@@ -32,13 +29,13 @@ The script will print the `SNAP=...` path. Save it for the next steps.
 ### Look at a bundle (quick)
 
 ```bash
-lsa plan $SNAP --title mocume2
+uv run --project tools/lsa lsa plan $SNAP --title mocume2
 ```
 
 ### AI prompt + Mermaid diagram (deep analysis)
 
 ```bash
-lsa plan $SNAP --title mocume2 --deep
+uv run --project tools/lsa lsa plan $SNAP --title mocume2 --deep
 ```
 
 ### Copy files for a Change Request
@@ -53,26 +50,31 @@ lsa plan $SNAP --title mocume2 --deep
 |------|---------|
 | First-time setup | `./scripts/setup.sh` |
 | Create snapshot | `./scripts/lsa-snap.sh` |
-| Find bundle by keyword | `lsa plan $SNAP --title <keyword>` |
-| Find bundle by CID+JobID | `lsa plan $SNAP --cid WCCU --jobid ds1` |
-| AI analysis prompt | `lsa plan $SNAP --title <keyword> --deep` |
-| Mermaid diagram | `lsa plan $SNAP --title <keyword> --mermaid` |
-| JSON output | `lsa plan $SNAP --title <keyword> --json` |
+| Find bundle by keyword | `uv run --project tools/lsa lsa plan $SNAP --title <keyword>` |
+| Find bundle by CID+JobID | `uv run --project tools/lsa lsa plan $SNAP --cid WCCU --jobid ds1` |
+| AI analysis prompt | `uv run --project tools/lsa lsa plan $SNAP --title <keyword> --deep` |
+| Mermaid diagram | `uv run --project tools/lsa lsa plan $SNAP --title <keyword> --mermaid` |
+| JSON output | `uv run --project tools/lsa lsa plan $SNAP --title <keyword> --json` |
 | Copy files to workspace | `./scripts/lsa-workspace.sh --snap $SNAP --title <keyword>` |
 | Full snapshot + import | `./scripts/mk_snap_and_scan.sh` |
 | Full workspace + SSH | `./scripts/mk_ticket_ws.sh TICKET --snap $SNAP --title "..."` |
 
 ## Troubleshooting
 
-### `lsa: command not found`
+### Running LSA commands
+
+LSA commands are run via UV:
 
 ```bash
-source ~/.bashrc
-# or check:
-type lsa
+uv run --project tools/lsa lsa --help
+uv run --project tools/lsa lsa plan $SNAP --title <keyword>
 ```
 
-If the function is missing, re-run `./scripts/setup.sh`.
+Or use the wrapper scripts directly:
+```bash
+./scripts/lsa-snap.sh
+./scripts/lsa-workspace.sh --snap $SNAP --title <keyword>
+```
 
 ### SSH password prompt every time
 

@@ -218,7 +218,7 @@ Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/con
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/setup.sh` | One-time interactive setup: UV install, `uv sync`, `lsa` shell function, SSH config, `~/.lsa/config.yaml` |
+| `scripts/setup.sh` | One-time interactive setup: UV install, `uv sync`, SSH config, `~/.lsa/config.yaml` |
 | `scripts/lsa_config.sh` | Config loader — sourced by other scripts, parses `~/.lsa/config.yaml` |
 | `scripts/lsa-snap.sh` | Simplified snapshot: rsync + `lsa scan` (no import-codes/histories) |
 | `scripts/lsa-workspace.sh` | Simplified workspace: `lsa plan --json` → copy files |
@@ -227,12 +227,11 @@ Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/con
 
 **Quick start:**
 ```bash
-./scripts/setup.sh                    # 1. one-time setup
-source ~/.bashrc
-lsa-snap.sh                           # 2. create snapshot
-lsa plan $SNAP --title mocume2         # 3. view bundle
-lsa plan $SNAP --title mocume2 --deep  # 4. AI prompt + diagram
-lsa-workspace.sh --snap $SNAP --title mocume2  # 5. copy files for CR
+./scripts/setup.sh                                                 # 1. one-time setup
+./scripts/lsa-snap.sh                                              # 2. create snapshot
+uv run --project tools/lsa lsa plan $SNAP --title mocume2          # 3. view bundle
+uv run --project tools/lsa lsa plan $SNAP --title mocume2 --deep   # 4. AI prompt + diagram
+./scripts/lsa-workspace.sh --snap $SNAP --title mocume2            # 5. copy files for CR
 ```
 
 ---
