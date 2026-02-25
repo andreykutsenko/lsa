@@ -129,13 +129,18 @@ def generate_ascii_call_tree(bundle: BundleCandidate, snapshot_path: Path) -> st
     runs_files = [f for f in bundle.files if f.source == "RUNS_edge"]
 
     result: list[str] = []
+    visited: set[str] = set()
 
     def _render_children(parent_bn: str, indent: str) -> None:
         children = call_graph.get(parent_bn, [])
         for i, child_bn in enumerate(children):
             is_last = i == len(children) - 1
             connector = "└── " if is_last else "├── "
+            if child_bn in visited:
+                result.append(indent + connector + child_bn + "  ↺")
+                continue
             result.append(indent + connector + child_bn)
+            visited.add(child_bn)
             _render_children(child_bn, indent + ("    " if is_last else "│   "))
 
     proc_prefix = f"  {bundle.proc_name} ──RUNS──► "
