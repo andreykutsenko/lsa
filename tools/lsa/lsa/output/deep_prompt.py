@@ -13,9 +13,14 @@ Read the files listed below, then generate a Mermaid diagram showing:
 4. Key output artifacts per path (AFP files, index files, paperless, client pickup, etc.)
 5. External systems involved (ISD, InfoTrac, preprocessing servers via SSH)
 
-Output ONLY a Mermaid diagram starting with "graph TD".
+Output format (strictly in this order):
+1. A clickable Mermaid Live link to view the diagram:
+   https://mermaid.live/edit#pako:{{base64-encoded-diagram}}
+2. The raw Mermaid source in a ```mermaid code block (for copy-paste into other tools).
+
+The diagram must start with "graph TD".
 Use subgraphs for each job_sel path. Label DocExec nodes with DFA name.
-No explanation — diagram only.\
+No explanation — link and diagram only.\
 """
 
 _INSTRUCTION_RU = """\
@@ -29,9 +34,14 @@ Job: {proc_name} ({title})
 4. Ключевые выходные артефакты (AFP, index, paperless, client pickup и т.д.)
 5. Внешние системы (ISD, InfoTrac, preprocessing серверы через SSH)
 
-Выведи ТОЛЬКО Mermaid диаграмму начиная с "graph TD".
+Формат вывода (строго в этом порядке):
+1. Кликабельная ссылка Mermaid Live для просмотра диаграммы:
+   https://mermaid.live/edit#pako:{{base64-encoded-diagram}}
+2. Исходный код Mermaid в блоке ```mermaid (для копирования в другие инструменты).
+
+Диаграмма должна начинаться с "graph TD".
 Используй subgraph для каждого пути. Помечай DocExec ноды именем DFA.
-Без пояснений — только диаграмма.\
+Без пояснений — только ссылка и диаграмма.\
 """
 
 

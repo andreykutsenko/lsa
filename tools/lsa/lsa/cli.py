@@ -977,11 +977,25 @@ def plan(
 
         if output_deep and candidates:
             from .output.deep_prompt import generate_deep_prompt
+            prompt_text = generate_deep_prompt(candidates[0], snapshot, lang=lang)
+
+            parts = []
+            if intent.get("cid"):
+                parts.append(intent["cid"])
+            if intent.get("jobid"):
+                parts.append(intent["jobid"])
+            if not parts:
+                parts.append(candidates[0].proc_name)
+            parts.append(datetime.now().strftime("%Y%m%d_%H%M%S"))
+            filename = "_".join(parts) + ".md"
+
+            prompts_dir = snapshot / ".lsa" / "ai_prompts"
+            prompts_dir.mkdir(parents=True, exist_ok=True)
+            deep_file = prompts_dir / filename
+            deep_file.write_text(prompt_text, encoding="utf-8")
+
             print()
-            print("=" * 60)
-            print("DEEP ANALYSIS PROMPT (paste to AI)")
-            print("=" * 60)
-            print(generate_deep_prompt(candidates[0], snapshot, lang=lang))
+            print(f"Deep prompt saved: {deep_file}")
 
 
 if __name__ == "__main__":

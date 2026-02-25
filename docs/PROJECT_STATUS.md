@@ -49,10 +49,10 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] i18n for plan output: `--lang en` (default) / `--lang ru`
 - [x] explain output cleanup: sections 3b/3c/3d conditional, section 6 removed, section 7 deduplicated by source
 - [x] explain `--prompt [--lang en|ru]`: AI-ready prompt with instruction + context pack + log snippet + source files
-- [x] plan --deep: AI prompt for full Papyrus flow analysis (DFA per job_sel, output artifacts, Mermaid diagram)
+- [x] plan --deep: AI prompt for full Papyrus flow analysis (saved to file in .lsa/ai_prompts/)
 - [x] plan: snapshot age warning (>7d INFO, >30d WARN)
 - [x] plan: secondary scripts discovery — CID+JobID wildcard match + call graph from RUNS scripts
-- [x] Onboarding: setup.sh, lsa_config.sh, lsa-snap.sh, lsa-workspace.sh
+- [x] Onboarding: setup.sh (SSH key auth), lsa_config.sh, lsa-snap.sh, lsa-workspace.sh
 - [x] explain --prompt: simplified — removed log snippet, instruction says "open FILES TO OPEN"
 
 ### Tests
@@ -218,7 +218,7 @@ Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/con
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/setup.sh` | One-time interactive setup: UV install, `uv sync`, SSH config, `~/.lsa/config.yaml` |
+| `scripts/setup.sh` | One-time interactive setup: UV install, `uv sync`, SSH key config (`~/.ssh/config`), `~/.lsa/config.yaml` |
 | `scripts/lsa_config.sh` | Config loader — sourced by other scripts, parses `~/.lsa/config.yaml` |
 | `scripts/lsa-snap.sh` | Simplified snapshot: rsync + `lsa scan` (no import-codes/histories) |
 | `scripts/lsa-workspace.sh` | Simplified workspace: `lsa plan --json` → copy files |
@@ -229,9 +229,10 @@ Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/con
 ```bash
 ./scripts/setup.sh                                                 # 1. one-time setup
 ./scripts/lsa-snap.sh                                              # 2. create snapshot
-uv run --project tools/lsa lsa plan $SNAP --title mocume2          # 3. view bundle
-uv run --project tools/lsa lsa plan $SNAP --title mocume2 --deep   # 4. AI prompt + diagram
-./scripts/lsa-workspace.sh --snap $SNAP --title mocume2            # 5. copy files for CR
+cd tools/lsa && source .venv/bin/activate                          # 3. activate LSA
+lsa plan $SNAP --title mocume2                                     # 4. view bundle
+lsa plan $SNAP --title mocume2 --deep                              # 5. AI prompt (saved to file)
+./scripts/lsa-workspace.sh --snap $SNAP --title mocume2            # 6. copy files for CR
 ```
 
 ---

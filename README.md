@@ -86,16 +86,19 @@ snapshot_project/                # NOT in Git (see .gitignore)
 git clone https://github.com/andreykutsenko/lsa.git
 cd lsa
 
-# One-time setup (installs UV, syncs deps, configures SSH)
+# One-time setup (installs UV, syncs deps, configures SSH key)
 ./scripts/setup.sh
 
-# Verify
-uv run --project tools/lsa lsa --help
+# Activate and verify
+cd tools/lsa
+source .venv/bin/activate
+lsa --help
 ```
 
-All `lsa` commands below assume you run them from the project root as:
+All `lsa` commands below assume you've activated the environment:
 ```bash
-uv run --project tools/lsa lsa <command> [args]
+cd tools/lsa
+source .venv/bin/activate
 ```
 
 ### Dev Setup (with tests)
@@ -103,7 +106,8 @@ uv run --project tools/lsa lsa <command> [args]
 ```bash
 cd tools/lsa
 uv sync --dev
-uv run pytest
+source .venv/bin/activate
+pytest
 ```
 
 ## Snapshot Workflow
@@ -128,9 +132,9 @@ rsync -avz "${1}:/home/procs/" "${SNAP_DIR}/procs/"
 # ... other directories
 
 # Index immediately
-uv run --project tools/lsa lsa scan "$SNAP_DIR"
-uv run --project tools/lsa lsa import-codes "$SNAP_DIR"
-uv run --project tools/lsa lsa import-histories "$SNAP_DIR"
+lsa scan "$SNAP_DIR"
+lsa import-codes "$SNAP_DIR"
+lsa import-histories "$SNAP_DIR"
 ```
 
 ### Typical Usage
@@ -306,10 +310,12 @@ Dependencies may be out of sync.
 
 ```bash
 # Re-sync dependencies
-uv sync --project tools/lsa
+cd tools/lsa
+uv sync
 
 # Verify
-uv run --project tools/lsa lsa --version
+source .venv/bin/activate
+lsa --version
 ```
 
 ### When do I need to re-sync?
