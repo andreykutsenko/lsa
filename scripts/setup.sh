@@ -74,17 +74,14 @@ section "--- Step 2: RHS server SSH key auth ---"
 echo "LSA connects to the RHS server to create snapshots."
 echo
 
-read -rp "RHS hostname (e.g. ca-isis-pr-04.infoimageinc.com): " rhs_host
-while [[ -z "$rhs_host" ]]; do
-  warn "Hostname cannot be empty."
-  read -rp "RHS hostname: " rhs_host
-done
+default_rhs_host="ca-isis-pr-04.infoimageinc.com"
+default_rhs_user="oper1"
 
-read -rp "SSH username: " rhs_user
-while [[ -z "$rhs_user" ]]; do
-  warn "Username cannot be empty."
-  read -rp "SSH username: " rhs_user
-done
+read -rp "RHS hostname [${default_rhs_host}]: " rhs_host
+rhs_host="${rhs_host:-$default_rhs_host}"
+
+read -rp "SSH username [${default_rhs_user}]: " rhs_user
+rhs_user="${rhs_user:-$default_rhs_user}"
 
 read -rp "Path to SSH private key (e.g. ~/.ssh/id_rsa): " key_path
 while [[ -z "$key_path" ]]; do
