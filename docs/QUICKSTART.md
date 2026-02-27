@@ -42,16 +42,20 @@ Re-run **only after a deployment to production**, not daily.
 At the end of the output the script prints the snapshot path:
 
 ```
-SNAP=/home/user/snapshots/rhs_snapshot_20260227_143012
+SNAP=/home/kts/snapshots/rhs_snapshot_20260227_143012
 ```
 
-Copy that path and export it as an environment variable:
+Copy the **exact absolute path** from that line and export it:
 
 ```bash
-export SNAP=/home/user/snapshots/rhs_snapshot_20260227_143012
+export SNAP=/home/kts/snapshots/rhs_snapshot_20260227_143012
 ```
 
-> **Note:** `$SNAP` must be set in every new terminal session before running LSA commands.
+> **Important:** paste the full path as-is — no quotes, no extra spaces, no `~`.
+> Tilde (`~`) is not expanded inside quotes and causes a "path does not exist" error.
+> Use the path exactly as printed by `lsa-snap.sh`.
+>
+> `$SNAP` must be set in every new terminal session before running LSA commands.
 
 ## 3. Daily Workflow
 
@@ -59,8 +63,8 @@ export SNAP=/home/user/snapshots/rhs_snapshot_20260227_143012
 # Activate LSA environment
 source .venv/bin/activate
 
-# Set SNAP (paste the path from the snapshot step; update when snapshot is refreshed)
-export SNAP=~/snapshots/rhs_snapshot_YYYYMMDD_HHMMSS
+# Set SNAP — paste the exact path printed by lsa-snap.sh (no quotes, no ~)
+export SNAP=/home/kts/snapshots/rhs_snapshot_20260227_143012
 
 # Find a bundle by keyword
 lsa plan $SNAP --title mocume2
