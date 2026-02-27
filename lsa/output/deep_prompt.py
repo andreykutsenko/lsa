@@ -6,10 +6,18 @@ _INSTRUCTION_EN = """\
 You are analyzing a Papyrus/DocExec batch job processing system.
 Job: {proc_name} ({title})
 
-Read the files listed below, then generate a Mermaid diagram showing:
-1. All job_sel processing paths (s/f/e/b/t or whatever exists in the scripts)
+Read the files listed in FILES TO READ below. If you need additional files
+(helper scripts, DFAs, control files) that are not listed — read them directly
+from the snapshot. All production scripts are available locally at:
+  {snapshot_path}
+
+Generate a comprehensive Mermaid diagram showing:
+1. All job_sel processing paths. Typical values: s=print, e=archival, f=esite.
+   Determine all paths actually present in the scripts and .procs file.
 2. For each path: which scripts run and in what order
-3. Every DocExec step (format_only.sh, isisdisk.sh, isisdisk_daily.sh) with the DFA docdef name used
+   (include secondary helper scripts involved in formatting)
+3. Every DocExec step (format_only.sh, isisdisk.sh, isisdisk_daily.sh) with the
+   exact DFA docdef name for that step (read from .control or .procs files)
 4. Key output artifacts per path (AFP files, index files, paperless, client pickup, etc.)
 5. External systems involved (ISD, InfoTrac, preprocessing servers via SSH)
 
@@ -37,10 +45,18 @@ _INSTRUCTION_RU = """\
 Ты анализируешь систему пакетной обработки Papyrus/DocExec.
 Job: {proc_name} ({title})
 
-Прочитай файлы из списка ниже, затем сгенерируй Mermaid диаграмму:
-1. Все пути обработки по job_sel (s/f/e/b/t или что есть в скриптах)
+Прочитай файлы из раздела FILES TO READ ниже. Если тебе нужны дополнительные
+файлы (вспомогательные скрипты, DFA, control-файлы) которых нет в списке —
+читай их напрямую из снапшота. Все production-скрипты доступны локально:
+  {snapshot_path}
+
+Сгенерируй подробную Mermaid диаграмму:
+1. Все пути обработки по job_sel. Типичные значения: s=print, e=archival, f=esite.
+   Определи самостоятельно все реально присутствующие пути из скриптов и .procs файла.
 2. Для каждого пути: какие скрипты вызываются и в каком порядке
-3. Каждый DocExec шаг (format_only.sh, isisdisk.sh, isisdisk_daily.sh) с именем DFA docdef
+   (включая второстепенные скрипты, участвующие в форматировании)
+3. Каждый DocExec шаг (format_only.sh, isisdisk.sh, isisdisk_daily.sh) с точным
+   именем DFA docdef для этого шага (читай из .control или .procs файлов)
 4. Ключевые выходные артефакты (AFP, index, paperless, client pickup и т.д.)
 5. Внешние системы (ISD, InfoTrac, preprocessing серверы через SSH)
 
@@ -77,6 +93,7 @@ def generate_deep_prompt(bundle: BundleCandidate, snapshot_path: Path, lang: str
         proc_name=bundle.proc_name,
         title=bundle.display_name,
         diagrams_dir=diagrams_dir,
+        snapshot_path=snapshot_path,
     )
 
     sep = "=" * 60
