@@ -112,25 +112,13 @@ pytest
 
 Snapshots capture production system state at a point in time. **Do not copy logs into the snapshot** — logs are analyzed separately.
 
-Recommended helper script (`~/bin/mk_snap_and_scan.sh`):
+Use the included helper script:
 
 ```bash
-#!/bin/bash
-# Usage: mk_snap_and_scan.sh <source_host>
-set -e
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SNAP_DIR="$HOME/snapshots/snapshot_${TIMESTAMP}"
-
-# rsync from source (exclude logs, tmp, etc.)
-rsync -avz --exclude='*.log' --exclude='tmp/' \
-    "${1}:/home/master/" "${SNAP_DIR}/master/"
-rsync -avz "${1}:/home/procs/" "${SNAP_DIR}/procs/"
-# ... other directories
-
-# Index immediately
-lsa scan "$SNAP_DIR"
-lsa import-codes "$SNAP_DIR"
-lsa import-histories "$SNAP_DIR"
+./scripts/lsa-snap.sh                          # rsync + scan (codes/histories imported if found)
+./scripts/lsa-snap.sh 20260123                 # snapshot for a specific date
+./scripts/lsa-snap.sh --codes /path/codes.pdf  # explicit PDF for message codes
+./scripts/lsa-snap.sh --no-histories           # skip histories import
 ```
 
 ### Typical Usage

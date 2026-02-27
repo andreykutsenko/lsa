@@ -93,8 +93,9 @@ lsa plan $SNAP --title mocume2 --deep
 | Mermaid diagram | `lsa plan $SNAP --title <keyword> --mermaid` |
 | JSON output | `lsa plan $SNAP --title <keyword> --json` |
 | Copy files to workspace | `./scripts/lsa-workspace.sh --snap $SNAP --title <keyword>` |
-| Full snapshot + import | `./scripts/mk_snap_and_scan.sh` |
-| Full workspace + SSH | `./scripts/mk_ticket_ws.sh TICKET --snap $SNAP --title "..."` |
+| Snapshot + codes/histories | `./scripts/lsa-snap.sh` |
+| Workspace with SSH copy | `./scripts/lsa-workspace.sh --snap $SNAP --title <keyword> --ssh-copy` |
+| Workspace with ticket ID | `./scripts/lsa-workspace.sh INC0123456 --snap $SNAP --title <keyword>` |
 
 ## Troubleshooting
 
