@@ -456,17 +456,22 @@ def build_bundle(
                 ))
 
     # 8. Call graph discovery — scripts called by RUNS scripts
-    # Restrict candidate pool to scripts sharing the CID prefix (first 4 chars
-    # of proc_name) to avoid matching global utility scripts with no relation
-    # to this bundle.
-    cid_prefix = candidate.proc_name[:4].lower()
-    cid_scripts = conn.execute(
-        "SELECT path FROM artifacts WHERE kind = 'script' AND path LIKE ?",
-        (f"master/{cid_prefix}%",),
+    # Only scan RUNS scripts that share the CID prefix (proc-specific scripts).
+    # Global orchestration scripts (e.g. isis.sh) are excluded from scanning
+    # because they reference hundreds of unrelated scripts via comments/logs.
+    # The callee pool (known_basenames) remains unrestricted so cross-family
+    # utilities like common_utils.sh can still be discovered.
+    all_scripts = conn.execute(
+        "SELECT path FROM artifacts WHERE kind = 'script'"
     ).fetchall()
-    known_basenames = {Path(row["path"]).name for row in cid_scripts}
+    known_basenames = {Path(row["path"]).name for row in all_scripts}
 
-    runs_scripts = [f for f in candidate.files if f.source == "RUNS_edge"]
+    cid_prefix = candidate.proc_name[:4].lower()
+    runs_scripts = [
+        f for f in candidate.files
+        if f.source == "RUNS_edge"
+        and Path(f.path).name.startswith(cid_prefix)
+    ]
     for bundle_file in runs_scripts:
         script_path = snapshot_path / bundle_file.path
         if not script_path.exists():
