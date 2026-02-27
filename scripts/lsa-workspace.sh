@@ -33,7 +33,14 @@ TITLE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --snap)    SNAP="$2";  shift 2 ;;
+    --snap)
+      if [[ -z "${2:-}" || "${2:-}" == --* ]]; then
+        echo "[ERR] --snap requires a path value. \$SNAP is empty or not set."
+        echo "      Set it first: SNAP=/path/to/snapshot"
+        exit 2
+      fi
+      SNAP="$2"; shift 2
+      ;;
     --cid)     CID="$2";   shift 2 ;;
     --jobid)   JOBID="$2"; shift 2 ;;
     --title)   TITLE="$2"; shift 2 ;;
