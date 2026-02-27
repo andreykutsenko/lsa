@@ -73,6 +73,11 @@ info "LSA synced."
 section "--- Step 2: RHS server SSH key auth ---"
 echo "LSA connects to the RHS server to create snapshots."
 echo
+echo "  Default server: ca-isis-pr-04.infoimageinc.com"
+echo "  Default user:   oper1"
+echo
+echo "  Press Enter to use defaults, or type a new value to override."
+echo
 
 default_rhs_host="ca-isis-pr-04.infoimageinc.com"
 default_rhs_user="oper1"
@@ -99,10 +104,10 @@ fi
 mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"
 
-if [[ "$key_path" != "$HOME/.ssh/"* ]]; then
-  cp "$key_path" "$HOME/.ssh/lsa_rhs_key"
-  key_path="$HOME/.ssh/lsa_rhs_key"
-  info "Key copied to ~/.ssh/lsa_rhs_key"
+if [[ "$key_path" != "$HOME/.ssh/id_rsa" ]]; then
+  cp "$key_path" "$HOME/.ssh/id_rsa"
+  key_path="$HOME/.ssh/id_rsa"
+  info "Key copied to ~/.ssh/id_rsa"
 fi
 
 chmod 600 "$key_path"
@@ -113,7 +118,7 @@ cat >> "$HOME/.ssh/config" <<SSH_CONF
 Host rhs
   HostName $rhs_host
   User $rhs_user
-  IdentityFile $key_path
+  IdentityFile ~/.ssh/id_rsa
   PubkeyAuthentication yes
   StrictHostKeyChecking no
   ServerAliveInterval 60
