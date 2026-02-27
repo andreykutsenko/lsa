@@ -220,10 +220,8 @@ Shell scripts in `scripts/` for day-to-day work with LSA. Config via `~/.lsa/con
 |--------|---------|
 | `scripts/setup.sh` | One-time interactive setup: UV install, `uv sync`, SSH key config (`~/.ssh/config`), `~/.lsa/config.yaml` |
 | `scripts/lsa_config.sh` | Config loader — sourced by other scripts, parses `~/.lsa/config.yaml` |
-| `scripts/lsa-snap.sh` | Simplified snapshot: rsync + `lsa scan` (no import-codes/histories) |
-| `scripts/lsa-workspace.sh` | Simplified workspace: `lsa plan --json` → copy files |
-| `scripts/mk_snap_and_scan.sh` | Full snapshot: rsync + scan + import-codes + import-histories |
-| `scripts/mk_ticket_ws.sh` | Full workspace: per-ticket structure, SSH copy mode, pull script, notes |
+| `scripts/lsa-snap.sh` | Full snapshot: rsync + `lsa scan` + optional import-codes (PDF) + import-histories |
+| `scripts/lsa-workspace.sh` | Full workspace: optional ticket ID, snap/SSH copy mode (`--ssh-copy`/`--rhs-copy`), `mermaid/` dir, notes, pull script |
 
 **Quick start:**
 ```bash
