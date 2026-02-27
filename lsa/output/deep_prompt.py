@@ -12,14 +12,25 @@ from the snapshot. All production scripts are available locally at:
   {snapshot_path}
 
 Generate a comprehensive Mermaid diagram showing:
-1. All job_sel processing paths. Typical values: s=print, e=archival, f=esite.
-   Determine all paths actually present in the scripts and .procs file.
+1. All job_sel processing paths. Determine ALL values the scripts actually accept —
+   check case statements in every script. Common values: s=print, e=archival, f=esite.
+   Include test/dev paths (t, k, etc.) if they apply to this job.
 2. For each path: which scripts run and in what order
    (include secondary helper scripts involved in formatting)
 3. Every DocExec step (format_only.sh, isisdisk.sh, isisdisk_daily.sh) with the
    exact DFA docdef name for that step (read from .control or .procs files)
 4. Key output artifacts per path (AFP files, index files, paperless, client pickup, etc.)
 5. External systems involved (ISD, InfoTrac, preprocessing servers via SSH)
+6. Level of detail: each script invocation or significant shell function call is a
+   separate node. For multi-step helper scripts (archival, processing shells), show
+   their internal pipeline (e.g., convert→compress→encrypt→copy), not just the script name.
+7. Paperless/suppression: if .procs or .ins references suppression lists (ESUP, paperless),
+   show them as data inputs with dotted arrows (-.->).
+8. Styling — add style directives:
+   - DocExec nodes (format/print steps): fill:#e8d5b7
+   - Decision nodes (job_sel branches): fill:#f5a623
+   - Start/End nodes: fill:#4a90d9,color:#fff
+   - Each job_sel subgraph uses a distinct fill color for visual distinction
 
 Output:
 1. Save the diagram to: {diagrams_dir}/{proc_name}.mmd
@@ -51,14 +62,27 @@ Job: {proc_name} ({title})
   {snapshot_path}
 
 Сгенерируй подробную Mermaid диаграмму:
-1. Все пути обработки по job_sel. Типичные значения: s=print, e=archival, f=esite.
-   Определи самостоятельно все реально присутствующие пути из скриптов и .procs файла.
+1. Все пути обработки по job_sel. Определи ВСЕ значения, которые реально
+   обрабатываются скриптами — проверь case-операторы в каждом скрипте.
+   Типичные значения: s=print, e=archival, f=esite.
+   Включи тестовые/dev пути (t, k и др.), если они применимы к этому job.
 2. Для каждого пути: какие скрипты вызываются и в каком порядке
    (включая второстепенные скрипты, участвующие в форматировании)
 3. Каждый DocExec шаг (format_only.sh, isisdisk.sh, isisdisk_daily.sh) с точным
    именем DFA docdef для этого шага (читай из .control или .procs файлов)
 4. Ключевые выходные артефакты (AFP, index, paperless, client pickup и т.д.)
 5. Внешние системы (ISD, InfoTrac, preprocessing серверы через SSH)
+6. Уровень детализации: каждый вызов скрипта или значимый вызов shell-функции —
+   отдельная нода. Для многошаговых вспомогательных скриптов (архивирование,
+   обработка) показывай внутренний pipeline (например, convert→compress→encrypt→copy),
+   а не просто имя скрипта.
+7. Paperless/suppression: если .procs или .ins ссылается на списки подавления
+   (ESUP, paperless), показывай их как входные данные с пунктирными стрелками (-.->).
+8. Стилизация — добавь style-директивы:
+   - DocExec ноды (шаги формата/печати): fill:#e8d5b7
+   - Decision ноды (ветвления по job_sel): fill:#f5a623
+   - Start/End ноды: fill:#4a90d9,color:#fff
+   - Каждый subgraph job_sel использует свой отличительный fill-цвет
 
 Вывод:
 1. Сохрани диаграмму в: {diagrams_dir}/{proc_name}.mmd
