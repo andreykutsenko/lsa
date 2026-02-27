@@ -43,8 +43,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$SNAP" ]]; then
-  echo "[ERR] --snap is required"
+  echo "[ERR] --snap is required (SNAP variable is not set or --snap value is missing)"
+  echo "      Set it first: SNAP=/path/to/snapshot"
   usage
+  exit 2
+fi
+
+if [[ "$SNAP" == --* ]]; then
+  echo "[ERR] --snap value looks like a flag ('$SNAP'). Did you forget to set \$SNAP?"
+  echo "      Set it first: SNAP=/path/to/snapshot"
   exit 2
 fi
 
