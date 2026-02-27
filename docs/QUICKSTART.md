@@ -32,30 +32,33 @@ Setup will:
 
 ## 2. Create Snapshot
 
-Snapshot = local copy of production scripts pulled from the RHS server via rsync.
-Re-run **only after a deployment to production**, not daily.
+A **snapshot** is a local directory containing all production scripts copied from the
+RHS server. LSA builds its search database (`.lsa/lsa.sqlite`) on top of these files.
+The files themselves are plain text — you can open them in any IDE or feed them directly
+to an LLM without going through the database.
+
+Re-run the snapshot **only after a deployment to production**, not daily.
 
 ```bash
 ./scripts/lsa-snap.sh
 ```
 
-At the end of the output the script prints the snapshot path:
+At the end of the output the script prints the path to the snapshot directory:
 
 ```
-SNAP=/home/kts/snapshots/rhs_snapshot_20260227_143012
+SNAP=<path to the snapshot directory>
 ```
 
-Copy the **exact absolute path** from that line and export it:
+Copy that path and set the `SNAP` variable — you will use it in all LSA commands:
 
 ```bash
-export SNAP=/home/kts/snapshots/rhs_snapshot_20260227_143012
+SNAP=<paste the path here>
 ```
 
-> **Important:** paste the full path as-is — no quotes, no extra spaces, no `~`.
-> Tilde (`~`) is not expanded inside quotes and causes a "path does not exist" error.
-> Use the path exactly as printed by `lsa-snap.sh`.
+> The exact path depends on the `snaproot` configured during setup and your OS.
+> Paste the path exactly as printed — no quotes, no extra spaces.
 >
-> `$SNAP` must be set in every new terminal session before running LSA commands.
+> `SNAP` must be set in every new terminal session before running LSA commands.
 
 ## 3. Daily Workflow
 
@@ -63,8 +66,8 @@ export SNAP=/home/kts/snapshots/rhs_snapshot_20260227_143012
 # Activate LSA environment
 source .venv/bin/activate
 
-# Set SNAP — paste the exact path printed by lsa-snap.sh (no quotes, no ~)
-export SNAP=/home/kts/snapshots/rhs_snapshot_20260227_143012
+# Set SNAP — paste the path printed by lsa-snap.sh
+SNAP=<path from step 2>
 
 # Find a bundle by keyword
 lsa plan $SNAP --title mocume2
