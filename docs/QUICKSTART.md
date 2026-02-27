@@ -1,5 +1,13 @@
 # LSA Quick Start
 
+## Prerequisites
+
+- **VPN must be active.**  All scripts connect to the RHS Linux server over the corporate network.  Without VPN, SSH and rsync will fail to connect.
+
+- **Run in a terminal:**
+  - Linux / macOS — use your regular terminal.
+  - Windows — open **WSL** (Windows Subsystem for Linux) and run all commands inside WSL.
+
 ## 1. Install
 
 ```bash
