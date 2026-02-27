@@ -119,7 +119,8 @@ mkdir -p \
   "$WS/prj" \
   "$WS/mapping" \
   "$WS/notes" \
-  "$WS/scripts"
+  "$WS/scripts" \
+  "$WS/mermaid"
 
 # LSA files land under code/<kind>/...
 mkdir -p "$WS/code/procs" "$WS/code/master" "$WS/code/insert" "$WS/code/control" "$WS/code/docdef" "$WS/code/other"
