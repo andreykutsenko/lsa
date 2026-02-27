@@ -456,10 +456,15 @@ def build_bundle(
                 ))
 
     # 8. Call graph discovery — scripts called by RUNS scripts
-    all_scripts = conn.execute(
-        "SELECT path FROM artifacts WHERE kind = 'script'"
+    # Restrict candidate pool to scripts sharing the CID prefix (first 4 chars
+    # of proc_name) to avoid matching global utility scripts with no relation
+    # to this bundle.
+    cid_prefix = candidate.proc_name[:4].lower()
+    cid_scripts = conn.execute(
+        "SELECT path FROM artifacts WHERE kind = 'script' AND path LIKE ?",
+        (f"master/{cid_prefix}%",),
     ).fetchall()
-    known_basenames = {Path(row["path"]).name for row in all_scripts}
+    known_basenames = {Path(row["path"]).name for row in cid_scripts}
 
     runs_scripts = [f for f in candidate.files if f.source == "RUNS_edge"]
     for bundle_file in runs_scripts:

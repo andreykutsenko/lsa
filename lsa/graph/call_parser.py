@@ -1,14 +1,21 @@
 """Parse script files to find calls to other known scripts."""
+import re
 from pathlib import Path
 
 
 def find_script_calls(content: str, known_basenames: set[str]) -> list[str]:
-    """Return basenames of known scripts mentioned in content.
+    """Return basenames of known scripts called in content.
 
-    Uses simple basename presence check — if a script's filename appears
-    in another script's content, it is considered called.
+    Uses word-boundary matching (no leading/trailing alphanumeric) to avoid
+    false positives from partial substring matches (e.g. 'split.pl' inside
+    'epcu_split.pl' or inside a comment mentioning another script).
     """
-    return [name for name in known_basenames if name in content]
+    found = []
+    for name in known_basenames:
+        pattern = r"(?<![a-zA-Z0-9_])" + re.escape(name) + r"(?![a-zA-Z0-9])"
+        if re.search(pattern, content):
+            found.append(name)
+    return found
 
 
 def build_call_graph(
