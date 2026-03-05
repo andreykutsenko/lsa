@@ -1,18 +1,21 @@
 # LSA Quick Start
 
+**LSA** finds all files related to a batch job (scripts, controls, DFA templates) and packages
+them into an AI-ready prompt — so you can ask Claude or Cursor to explain the job and help debug it.
+
+---
+
 ## Prerequisites
 
-- **VPN must be active.** All scripts connect to the RHS Linux server over the corporate
-  network. Without VPN, SSH and rsync will fail.
-
-- **SSH private key** — obtain the `id_rsa` key for the RHS server and place it somewhere
-  accessible (e.g. `~/id_rsa`) **before** running setup.
-
+- **VPN must be active** — all scripts connect to the RHS server over the corporate network
+- **SSH private key** — get `id_rsa` from your team lead and save it (e.g. `~/id_rsa`)
 - **Terminal:**
-  - Linux / macOS — use your regular terminal.
-  - Windows — open **WSL** (Windows Subsystem for Linux) and run all commands inside WSL.
+  - Linux / macOS — regular terminal
+  - Windows — open **WSL** and run everything inside it
 
-## 1. Install
+---
+
+## Step 1 — Install (once)
 
 ```bash
 git clone git@github.com:andreykutsenko/lsa.git
@@ -20,130 +23,103 @@ cd lsa
 ./scripts/setup.sh
 ```
 
-During setup:
-- Press **Enter** to accept the default RHS host and user.
-- Enter the path to your SSH private key when prompted (e.g. `~/id_rsa`).
+When prompted: press **Enter** for the default server host/user, then enter the path to your SSH key.
 
-Setup will:
-- Install [UV](https://docs.astral.sh/uv/) package manager (if not present)
-- Sync LSA Python dependencies
-- Configure SSH key authentication (`~/.ssh/config`, `Host rhs`)
-- Write config to `~/.lsa/config.yaml`
+Setup installs all dependencies and writes your config to `~/.lsa/config.yaml`.
 
-## 2. Create Snapshot
+---
 
-A **snapshot** is a local directory containing all production scripts copied from the
-RHS server. LSA builds its search database (`.lsa/lsa.sqlite`) on top of these files.
-The files themselves are plain text — you can open them in any IDE or feed them directly
-to an LLM without going through the database.
+## Step 2 — Create a Snapshot (when needed)
 
-Re-run the snapshot **only after a deployment to production**, not daily.
+A **snapshot** is a local copy of all production scripts. LSA builds its search database on top of it.
 
 ```bash
 ./scripts/lsa-snap.sh
 ```
 
-At the end of the output the script prints the path to the snapshot directory:
+The script prints the snapshot path at the end — **copy it**:
 
 ```
-SNAP=<path to the snapshot directory>
+SNAP=/home/you/snapshots/rhs_snapshot_20260225_114334
 ```
 
-Copy that path and set the `SNAP` variable — you will use it in all LSA commands:
+---
+
+## Step 3 — Daily Workflow
+
+**Activate LSA and set your snapshot path** (do this in every new terminal session):
 
 ```bash
-SNAP=<paste the path here>
-```
-
-> The exact path depends on the `snaproot` configured during setup and your OS.
-> Paste the path exactly as printed — no quotes, no extra spaces.
->
-> `SNAP` must be set in every new terminal session before running LSA commands.
-
-## 3. Daily Workflow
-
-```bash
-# Activate LSA environment
+cd lsa
 source .venv/bin/activate
+SNAP=<paste your snapshot path here>
+```
 
-# Set SNAP — paste the path printed by lsa-snap.sh
-SNAP=<path from step 2>
+### Find files and generate an AI prompt
 
-# Find a bundle by keyword
+Use CID (4 letters) + Job ID as the `--title` keyword — e.g. `mocume2` for CID `mocu` + job `me2`.
+
+```bash
+# See which files belong to a job
 lsa plan $SNAP --title mocume2
 
-# AI deep-analysis prompt (output saved to file)
+# Generate an AI prompt for deep analysis (path to saved file is printed)
 lsa plan $SNAP --title mocume2 --deep
-
-# Copy files to a workspace for a Change Request
-./scripts/lsa-workspace.sh --snap $SNAP --title mocume2
 ```
+
+Open the saved file, copy its contents, paste into Cursor or Claude.
+
+### Copy files to a workspace
+
+Provide the ticket ID as the first argument — the workspace folder will be named after it.
+
+```bash
+# From snapshot (fast, for reading/reviewing)
+./scripts/lsa-workspace.sh INC0123456 --snap $SNAP --title mocume2
+
+# From the production server (when you need to edit and push back)
+./scripts/lsa-workspace.sh INC0123456 --snap $SNAP --title mocume2 --ssh-copy
+```
+
+> `--ssh-copy` copies files one by one via SSH. On a normal office/VPN connection it takes
+> under a minute for a typical job.
+
+The script prints the workspace path at the end. Open it in your IDE.
+
+---
 
 ## Cheat Sheet
 
 | Task | Command |
 |------|---------|
-| First-time setup | `./scripts/setup.sh` |
-| Create snapshot | `./scripts/lsa-snap.sh` |
+| One-time setup | `./scripts/setup.sh` |
+| Create/refresh snapshot | `./scripts/lsa-snap.sh` |
 | Activate LSA | `source .venv/bin/activate` |
-| Set snapshot path | `export SNAP=~/snapshots/rhs_snapshot_...` |
-| Find bundle by keyword | `lsa plan $SNAP --title <keyword>` |
-| Find bundle by CID+JobID | `lsa plan $SNAP --cid WCCU --jobid ds1` |
-| AI deep analysis prompt | `lsa plan $SNAP --title <keyword> --deep` |
-| Mermaid diagram | `lsa plan $SNAP --title <keyword> --mermaid` |
-| JSON output | `lsa plan $SNAP --title <keyword> --json` |
-| Copy files to workspace | `./scripts/lsa-workspace.sh --snap $SNAP --title <keyword>` |
-| Snapshot + codes/histories | `./scripts/lsa-snap.sh` |
-| Workspace with SSH copy | `./scripts/lsa-workspace.sh --snap $SNAP --title <keyword> --ssh-copy` |
-| Workspace with ticket ID | `./scripts/lsa-workspace.sh INC0123456 --snap $SNAP --title <keyword>` |
+| Set snapshot path | `SNAP=<path from lsa-snap.sh>` |
+| See file scope for a job | `lsa plan $SNAP --title <cid+jobid>` |
+| AI deep-analysis prompt | `lsa plan $SNAP --title <cid+jobid> --deep` |
+| Copy files (from snapshot) | `./scripts/lsa-workspace.sh <TICKET> --snap $SNAP --title <cid+jobid>` |
+| Copy files (from prod server) | `./scripts/lsa-workspace.sh <TICKET> --snap $SNAP --title <cid+jobid> --ssh-copy` |
+
+---
 
 ## Troubleshooting
 
-### Activating LSA environment
-
+**`lsa: command not found`** — activate the environment first:
 ```bash
 source .venv/bin/activate
-lsa --help
 ```
 
-If `.venv` doesn't exist, re-run setup:
-
+**`ssh rhs` asks for a password** — SSH key not configured. Re-run setup:
 ```bash
 ./scripts/setup.sh
 ```
 
-### SSH connection issues
-
-`setup.sh` configures `~/.ssh/config` with `Host rhs`. Test with:
-
-```bash
-ssh rhs "echo OK"
-```
-
-If it fails:
-- Make sure VPN is active.
-- Check that `~/.ssh/id_rsa` exists and has permissions `600`.
-- Re-run `./scripts/setup.sh` to reconfigure.
-
-### rsync asks for a password
-
-This means the SSH key is not being picked up. Verify:
-
-```bash
-ls -la ~/.ssh/id_rsa    # must exist, permissions 600
-ssh rhs "echo OK"       # must succeed without a password prompt
-```
-
-### Slow rsync
-
-First snapshot copies everything and can take 10–15 minutes.
-Subsequent runs are incremental and much faster.
-
-### Snapshot is N days old
-
-This is a reminder, not an error. Update the snapshot only when
-production scripts have actually changed (after a deployment):
-
+**`Error: Database not found`** — snapshot has no DB yet. Re-run:
 ```bash
 ./scripts/lsa-snap.sh
 ```
+
+**Snapshot is N days old** — reminder only, not an error. Update only when needed.
+
+**First snapshot is slow** — it copies everything and can take 10–15 minutes. Subsequent runs are incremental and much faster.
