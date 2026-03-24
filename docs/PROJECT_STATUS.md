@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-03-24
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -16,7 +16,7 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 
 ---
 
-## Done (v0.3.0)
+## Done (v0.4.0)
 
 ### Core Commands
 - [x] `lsa scan` — index snapshot, build execution graph from .procs
@@ -54,9 +54,20 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 - [x] plan: secondary scripts discovery — CID+JobID wildcard match + call graph from RUNS scripts
 - [x] Onboarding: setup.sh (SSH key auth), lsa_config.sh, lsa-snap.sh, lsa-workspace.sh
 - [x] explain --prompt: simplified — removed log snippet, instruction says "open FILES TO OPEN"
+- [x] `lsa serve` — web UI for interactive snapshot analysis (FastAPI + vanilla JS)
+
+### Web UI (`lsa serve`)
+- [x] Snapshot management: list, select, create (rsync from RHS), delete with confirmation
+- [x] SSE progress bars for snapshot creation and workspace creation
+- [x] Bundle: plan generation, candidate selection, file preview, Mermaid graph
+- [x] Prompt: cursor/deep/explain modes, error text, language toggle, copy to clipboard
+- [x] Workspace creation: snap/SSH copy modes, pull script generation
+- [x] Context pages: Overview (stats), Search (FTS5)
+- [x] Light theme (OpenClaw-inspired: Inter + JetBrains Mono, teal accent)
+- [x] WSL support: Windows Explorer paths (`\\wsl.localhost\...`) with copy-to-clipboard
 
 ### Tests
-- [x] 147 tests passing (as of 2026-02-24)
+- [x] 147 tests passing (as of 2026-03-24)
 - [x] test_wrapper_noise.py
 - [x] test_message_codes.py
 - [x] test_external_signals.py
@@ -174,7 +185,6 @@ Strengthen case_cards as a solutions knowledge base:
 ### Other Ideas
 - [ ] `lsa export` — export context pack to file (for automation)
 - [ ] `lsa plan --lang zh` — add more languages as needed
-- [ ] Web UI (optional, low priority)
 
 ---
 
@@ -209,6 +219,10 @@ Strengthen case_cards as a solutions knowledge base:
 | Log parser | `lsa/parsers/log_parser.py` |
 | PDF parser | `lsa/parsers/pdf_parser.py` |
 | Tests | `tests/` |
+| Web UI backend | `lsa/web/server.py` |
+| Web UI frontend | `lsa/web/static/` (app.js, style.css, index.html) |
+| Web UI launcher | `lsa/web/launcher.py` |
+| User config loader | `lsa/config.py` → `load_user_config()` |
 
 ---
 
@@ -231,6 +245,7 @@ source .venv/bin/activate                                          # 3. activate
 lsa plan $SNAP --title mocume2                                     # 4. view bundle
 lsa plan $SNAP --title mocume2 --deep                              # 5. AI prompt (saved to file)
 ./scripts/lsa-workspace.sh --snap $SNAP --title mocume2            # 6. copy files for CR
+lsa serve $SNAP                                                    # 7. web UI (alternative to CLI)
 ```
 
 ---
