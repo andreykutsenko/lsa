@@ -15,6 +15,7 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
+web = ["fastapi>=0.110.0", "uvicorn[standard]>=0.29.0"]
 
 [project.scripts]
 lsa = "lsa.cli:app"
@@ -33,6 +34,7 @@ packages = ["lsa"]
 include = [
     "lsa/**/*.py",
     "lsa/**/*.yaml",
+    "lsa/web/static/**",
 ]
 
 [dependency-groups]
