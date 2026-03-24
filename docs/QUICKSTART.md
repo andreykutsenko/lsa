@@ -86,6 +86,21 @@ Provide the ticket ID as the first argument — the workspace folder will be nam
 
 The script prints the workspace path at the end. Open it in your IDE.
 
+### Alternative: Web UI
+
+Instead of the command line, you can use the browser-based interface:
+
+```bash
+lsa serve $SNAP
+```
+
+This opens a web UI at `http://127.0.0.1:18900` with:
+- **Snapshot** — list, select, create new snapshots (rsync from production), delete
+- **Bundle** — find related files, preview, create workspaces
+- **Prompt** — generate AI prompts (cursor/deep/explain), copy to clipboard
+
+> On WSL, created snapshots and workspaces show a clickable Windows Explorer path.
+
 ---
 
 ## Cheat Sheet
@@ -100,6 +115,8 @@ The script prints the workspace path at the end. Open it in your IDE.
 | AI deep-analysis prompt | `lsa plan $SNAP --title <cid+jobid> --deep` |
 | Copy files (from snapshot) | `./scripts/lsa-workspace.sh <TICKET> --snap $SNAP --title <cid+jobid>` |
 | Copy files (from prod server) | `./scripts/lsa-workspace.sh <TICKET> --snap $SNAP --title <cid+jobid> --ssh-copy` |
+| Start web UI | `lsa serve $SNAP` |
+| Start web UI (no snapshot) | `lsa serve` |
 
 ---
 
@@ -123,3 +140,8 @@ source .venv/bin/activate
 **Snapshot is N days old** — reminder only, not an error. Update only when needed.
 
 **First snapshot is slow** — it copies everything and can take 10–15 minutes. Subsequent runs are incremental and much faster.
+
+**`lsa serve` shows "Web UI requires extra dependencies"** — install the web extras:
+```bash
+pip install 'lsa[web]'
+```

@@ -246,6 +246,65 @@ LSA CONTEXT PACK
 ════════════════════════════════════════════════════════════════
 ```
 
+## Web UI (`lsa serve`)
+
+Optional browser-based frontend as alternative to CLI. Requires `pip install 'lsa[web]'`.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          lsa serve [SNAPSHOT]                               │
+│                          http://127.0.0.1:18900                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+              ┌──────────────────────┼──────────────────────┐
+              ▼                      ▼                      ▼
+     ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+     │  Snapshot    │       │   Bundle    │       │   Prompt    │
+     │  Management  │       │   Builder   │       │  Generator  │
+     ├─────────────┤       ├─────────────┤       ├─────────────┤
+     │ List/Select  │       │ lsa plan    │       │ cursor mode │
+     │ Create (rsync│       │ Candidates  │       │ deep mode   │
+     │   from RHS)  │       │ File preview│       │ explain mode│
+     │ Delete       │       │ Mermaid     │       │ Copy to     │
+     │ SSE progress │       │ Workspace   │       │  clipboard  │
+     └─────────────┘       └─────────────┘       └─────────────┘
+```
+
+**Stack:**
+- Backend: FastAPI (Python), thin wrappers around existing LSA functions
+- Frontend: vanilla JS SPA, no build step (single `app.js` + `style.css`)
+- Long operations (snapshot creation, workspace creation) use **SSE** (Server-Sent Events) for real-time progress
+
+**API endpoints:**
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/snapshots` | GET | List snapshots from snaproot |
+| `/api/snapshot/select` | POST | Set active snapshot |
+| `/api/snapshot/create` | POST | Rsync from RHS + scan + import (SSE stream) |
+| `/api/snapshot` | DELETE | Delete snapshot (within snaproot only) |
+| `/api/plan` | POST | Generate plan (wraps `generate_plan()`) |
+| `/api/plan/mermaid` | POST | Generate Mermaid dependency graph |
+| `/api/workspace/create` | POST | Create workspace with files (SSE stream) |
+| `/api/prompt` | POST | Generate AI prompt (cursor/deep/explain) |
+| `/api/file` | GET | Read file from snapshot |
+| `/api/search` | GET | FTS5 + LIKE fallback search |
+| `/api/stats` | GET | Snapshot statistics |
+
+**Snapshot creation replicates `lsa-snap.sh`:**
+1. `rsync` 5 directories from RHS (master, procs, control, insert, docdef)
+2. `lsa scan` — build DB
+3. `lsa import-codes` — import message codes (optional, from config)
+4. `lsa import-histories` — import case cards (optional, from config)
+
+**Workspace creation replicates `lsa-workspace.sh`:**
+1. Create directory structure (code/, logs/, notes/, scripts/, ...)
+2. Copy files from snapshot (snap mode) or RHS (ssh mode via rsync)
+3. Generate `pull_from_rhs.sh` script
+4. Generate notes and plan JSON
+
+```
+
 ## Database Schema (ER Diagram)
 
 ```

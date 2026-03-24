@@ -49,6 +49,16 @@ You give it a log file, and it returns:
    → Outputs a "Context Pack" ready to paste into IDE/AI
 ```
 
+### Browser Alternative: `lsa serve`
+
+All of the above is also available through a web interface:
+
+```bash
+lsa serve /path/to/snapshot
+```
+
+The web UI provides snapshot management, file search, AI prompt generation, and workspace creation — all from the browser at `http://127.0.0.1:18900`.
+
 ## What You Get
 
 When you run `lsa explain`, you get a single block of text containing:
