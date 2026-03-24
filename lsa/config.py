@@ -38,3 +38,21 @@ MAX_EVIDENCE_SNIPPET = 120
 def get_db_path(snapshot_path: Path) -> Path:
     """Get path to SQLite database for a snapshot."""
     return snapshot_path / DB_DIR / DB_NAME
+
+
+def load_user_config() -> dict:
+    """Load user config from ~/.lsa/config.yaml.
+
+    Returns dict with keys like snaproot, workroot, rhs_host, rhs_user.
+    Missing keys default to empty dict.
+    """
+    config_path = Path.home() / ".lsa" / "config.yaml"
+    if not config_path.exists():
+        return {}
+    try:
+        import yaml
+        with open(config_path) as f:
+            data = yaml.safe_load(f) or {}
+        return data
+    except Exception:
+        return {}

@@ -999,5 +999,42 @@ def plan(
             print(f"Deep prompt saved: {deep_file}")
 
 
+@app.command()
+def serve(
+    snapshot: Path = typer.Argument(None, help="Path to indexed snapshot (optional — pick in UI if omitted)"),
+    port: int = typer.Option(18900, help="Port to serve on"),
+    host: str = typer.Option("127.0.0.1", help="Host to bind to"),
+    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open browser on start"),
+):
+    """Launch web UI for interactive snapshot analysis."""
+    try:
+        import uvicorn
+    except ImportError:
+        console.print(
+            "[red]Web UI requires extra dependencies.[/red]\n"
+            "Install with: pip install 'lsa[web]'"
+        )
+        raise typer.Exit(1)
+
+    if snapshot is not None:
+        snapshot = snapshot.resolve()
+        db_path = get_db_path(snapshot)
+        if not db_path.exists():
+            console.print(f"[red]No database found at {db_path}[/red]\nRun 'lsa scan {snapshot}' first.")
+            raise typer.Exit(1)
+
+    from .web.server import create_app
+    create_app(snapshot_path=snapshot)
+
+    url = f"http://{host}:{port}"
+    console.print(f"[green]LSA Web UI[/green] → {url}")
+
+    if open_browser:
+        import webbrowser
+        webbrowser.open(url)
+
+    uvicorn.run("lsa.web.server:app", host=host, port=port, log_level="warning")
+
+
 if __name__ == "__main__":
     app()
