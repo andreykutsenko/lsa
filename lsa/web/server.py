@@ -81,14 +81,25 @@ class MermaidRequest(BaseModel):
 
 
 class PromptRequest(BaseModel):
-    mode: str  # "cursor" | "deep" | "explain"
+    mode: str = "deep"  # "cursor" | "deep" | "explain"
     error_text: str | None = None
     lang: str = "en"
     candidate_index: int = 0
+    scenario: str | None = None  # "incident" | "change_request"
+    prompt_input: str | None = None
+    include_diagram: bool = False
+    save_prompt: bool = False
 
 
 class NewSnapshotRequest(BaseModel):
     name: str
+    pdf_path: str | None = None
+    incidents_path: str | None = None
+    research_path: str | None = None
+    related_path: str | None = None
+    prox_path: str | None = None
+    control_path: str | None = None
+    insert_path: str | None = None
 
 
 class WorkspaceRequest(BaseModel):
@@ -145,6 +156,19 @@ def _build_snapshot_info(snap_dir: Path) -> dict:
     }
 
 
+def _normalized_contents(artifacts: dict[str, int]) -> dict[str, int]:
+    """Normalize artifact kinds to operator-facing families."""
+    return {
+        "procs": artifacts.get("procs", 0),
+        "scripts": artifacts.get("script", 0) + artifacts.get("master", 0),
+        "controls": artifacts.get("control", 0),
+        "inserts": artifacts.get("insert", 0),
+        "docdef": artifacts.get("docdef", 0),
+        "logs": artifacts.get("logs_inbox", 0),
+        "refs": artifacts.get("refs", 0),
+    }
+
+
 def _get_snapshot_stats(snap_dir: Path) -> dict:
     """Get stats for a snapshot."""
     conn = _open_connection(snap_dir)
@@ -158,18 +182,36 @@ def _get_snapshot_stats(snap_dir: Path) -> dict:
         from lsa.graph.builder import get_graph_stats
         graph = get_graph_stats(conn)
 
-        from lsa.db.connection import count_incidents, count_case_cards, count_message_codes
+        from lsa.db.connection import (
+            count_case_cards,
+            count_incidents,
+            count_message_codes,
+            get_incidents,
+        )
         incidents = count_incidents(conn)
         case_cards = count_case_cards(conn)
         message_codes = count_message_codes(conn)
+        recent_incidents = get_incidents(conn, limit=5)
+        recent_case_cards = conn.execute(
+            """
+            SELECT id, source_path, title, root_cause, fix_summary, created_at, updated_at
+            FROM case_cards
+            ORDER BY COALESCE(updated_at, created_at) DESC
+            LIMIT 5
+            """
+        ).fetchall()
+        contents = _normalized_contents(artifacts)
 
         return {
             "artifacts": total_artifacts,
             "artifacts_by_kind": artifacts,
+            "contents": contents,
             "nodes": graph.get("total_nodes", 0),
             "edges": graph.get("total_edges", 0),
             "incidents": incidents,
+            "recent_incidents": recent_incidents,
             "case_cards": case_cards,
+            "recent_case_cards": [dict(row) for row in recent_case_cards],
             "message_codes": message_codes,
         }
     finally:
@@ -241,7 +283,7 @@ async def create_snapshot(req: NewSnapshotRequest):
         raise HTTPException(400, f"Snapshot 'rhs_snapshot_{req.name}' already exists")
 
     return StreamingResponse(
-        _snapshot_create_stream(req.name, snap_dir, cfg),
+        _snapshot_create_stream(req, snap_dir, cfg),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -252,21 +294,40 @@ def _sse_event(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-def _snapshot_create_stream(name: str, snap_dir: Path, cfg: dict):
+def _copy_optional_source(source: Path, target: Path) -> None:
+    """Copy a file or directory into the snapshot."""
+    if target.exists():
+        shutil.rmtree(target) if target.is_dir() else target.unlink()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source.is_dir():
+        shutil.copytree(source, target)
+    else:
+        shutil.copy2(source, target)
+
+
+def _snapshot_create_stream(req: NewSnapshotRequest, snap_dir: Path, cfg: dict):
     """Generator that yields SSE events as snapshot creation progresses."""
     rhs_host = cfg["rhs_host"]
     rhs_user = cfg.get("rhs_user")
     ssh_target = f"{rhs_user}@{rhs_host}" if rhs_user else rhs_host
-    pdf_codes = cfg.get("pdf_codes_default")
-    hist_dir = cfg.get("hist_dir_default")
+    pdf_codes = req.pdf_path or cfg.get("pdf_codes_default")
+    hist_dir = req.incidents_path or cfg.get("hist_dir_default")
     hist_glob = cfg.get("hist_glob_default")
+    research_path = Path(req.research_path).expanduser() if req.research_path else None
+    related_path = Path(req.related_path).expanduser() if req.related_path else None
+    prox_path = Path(req.prox_path).expanduser() if req.prox_path else None
+    control_path = Path(req.control_path).expanduser() if req.control_path else None
+    insert_path = Path(req.insert_path).expanduser() if req.insert_path else None
 
-    # Count total steps: 5 rsync + scan + optional import-codes + optional import-histories
+    # Count total steps: 5 rsync + scan + optional enrichments/imports
     total_steps = 5 + 1  # rsync dirs + scan
     if pdf_codes:
         total_steps += 1
     if hist_dir:
         total_steps += 1
+    for path in (research_path, related_path, prox_path, control_path, insert_path):
+        if path:
+            total_steps += 1
 
     step = 0
     rsync_errors = []
@@ -368,6 +429,25 @@ def _snapshot_create_stream(name: str, snap_dir: Path, cfg: dict):
         except Exception:
             import_histories_ok = False
 
+    optional_copy_results: list[dict[str, Any]] = []
+    optional_sources = [
+        ("research", research_path, snap_dir / "refs" / "research"),
+        ("related", related_path, snap_dir / "refs" / "related"),
+        ("prox", prox_path, snap_dir / "refs" / "prox"),
+        ("control", control_path, snap_dir / "control" / "_optional"),
+        ("insert", insert_path, snap_dir / "insert" / "_optional"),
+    ]
+    for label, source, target in optional_sources:
+        if not source:
+            continue
+        step += 1
+        yield _sse_event({"step": step, "total": total_steps, "label": f"Copying {label} source..."})
+        try:
+            _copy_optional_source(source, target)
+            optional_copy_results.append({"label": label, "ok": True, "target": str(target)})
+        except Exception as e:
+            optional_copy_results.append({"label": label, "ok": False, "error": str(e)})
+
     yield _sse_event({
         "step": total_steps,
         "total": total_steps,
@@ -376,12 +456,13 @@ def _snapshot_create_stream(name: str, snap_dir: Path, cfg: dict):
         "status": "created",
         "path": str(snap_dir),
         "path_win": _to_windows_path(str(snap_dir)),
-        "name": name,
+        "name": req.name,
         "rsync_errors": rsync_errors,
         "scan_ok": scan_ok,
         "scan_error": scan_error,
         "import_codes_ok": import_codes_ok,
         "import_histories_ok": import_histories_ok,
+        "optional_copy_results": optional_copy_results,
     })
 
 
@@ -437,9 +518,9 @@ async def plan_mermaid(req: MermaidRequest):
         raise HTTPException(
             400, f"candidate_index {idx} out of range (0..{len(_last_candidates) - 1})"
         )
-    from lsa.output.mermaid import generate_mermaid
+    from lsa.output.mermaid import generate_mermaid, to_mermaid_live_url
     mermaid_code = generate_mermaid(_last_candidates[idx], snapshot)
-    return {"mermaid_code": mermaid_code}
+    return {"mermaid_code": mermaid_code, "live_url": to_mermaid_live_url(mermaid_code)}
 
 
 # --- API: File ---
@@ -474,9 +555,195 @@ async def read_file(path: str = Query(...)):
 
 # --- API: Prompt ---
 
+def _operator_scope_summary(candidate: Any) -> dict[str, Any]:
+    """Build an operator-facing summary of a selected candidate."""
+    files = getattr(candidate, "files", []) or []
+    grouped = {
+        "procs": 0,
+        "scripts": 0,
+        "controls": 0,
+        "inserts": 0,
+        "docdef": 0,
+        "other": 0,
+    }
+    runs_scripts: list[str] = []
+    controls: list[str] = []
+    docdefs: list[str] = []
+    for f in files:
+        if f.kind == "procs":
+            grouped["procs"] += 1
+        elif f.kind in {"script", "master"}:
+            grouped["scripts"] += 1
+            if getattr(f, "source", "") == "RUNS_edge":
+                runs_scripts.append(f.path)
+        elif f.kind == "control":
+            grouped["controls"] += 1
+            controls.append(f.path)
+        elif f.kind == "insert":
+            grouped["inserts"] += 1
+        elif f.kind == "docdef":
+            grouped["docdef"] += 1
+            docdefs.append(f.path)
+        else:
+            grouped["other"] += 1
+
+    read_order = [
+        f"proc: {getattr(candidate, 'proc_name', 'unknown')}",
+        *[f"script: {Path(path).name}" for path in runs_scripts[:3]],
+        *[f"control: {Path(path).name}" for path in controls[:2]],
+        *[f"docdef: {Path(path).name}" for path in docdefs[:1]],
+    ]
+    return {
+        "file_count": len(files),
+        "counts": grouped,
+        "runs_scripts": runs_scripts[:5],
+        "controls": controls[:5],
+        "docdefs": docdefs[:5],
+        "read_order": read_order[:6],
+    }
+
+
+def _save_prompt_text(snapshot: Path, proc_name: str, scenario: str, text: str) -> str:
+    """Persist a generated prompt inside the snapshot."""
+    prompts_dir = snapshot / ".lsa" / "ai_prompts"
+    prompts_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    saved_path = prompts_dir / f"{proc_name}_{scenario}_{ts}.md"
+    saved_path.write_text(text, encoding="utf-8")
+    return str(saved_path)
+
+
+def _build_scenario_prompt(
+    snapshot: Path,
+    candidate: Any,
+    *,
+    lang: str,
+    scenario: str,
+    prompt_input: str,
+    include_diagram: bool,
+) -> dict[str, Any]:
+    """Build an operator-oriented prompt from the current scope."""
+    scope = _operator_scope_summary(candidate)
+    file_lines = [f"- [{f.kind}] {snapshot / f.path}" for f in candidate.files]
+    mermaid_code = None
+    diagram_block = ""
+    if include_diagram:
+        from lsa.output.mermaid import generate_mermaid
+        mermaid_code = generate_mermaid(candidate, snapshot)
+        diagram_block = "\n".join([
+            "",
+            "## Dependency diagram (Mermaid)",
+            "",
+            "```mermaid",
+            mermaid_code,
+            "```",
+        ])
+
+    if lang == "ru":
+        if scenario == "incident":
+            title = "Incident analysis"
+            instruction = (
+                "Ты внешний инженер-аналитик. Используй snapshot, текущий scope и ключевые файлы ниже, "
+                "чтобы определить наиболее вероятную корневую причину инцидента. "
+                "Нужен ответ с root cause, evidence, что проверять дальше, и короткий ticket-ready fix или escalation."
+            )
+            input_title = "Ошибка / лог / текст тикета"
+        else:
+            title = "Change request analysis"
+            instruction = (
+                "Ты внешний инженер-аналитик. Используй snapshot, текущий scope и ключевые файлы ниже, "
+                "чтобы оценить impact change request, указать затронутые области, риски, план изменений и проверки."
+            )
+            input_title = "Описание доработки"
+    else:
+        if scenario == "incident":
+            title = "Incident analysis"
+            instruction = (
+                "You are an external engineer analyzing an incident. Use the snapshot, current scope, and key files below "
+                "to determine the most probable root cause. Return root cause, evidence, next checks, and a short ticket-ready fix or escalation."
+            )
+            input_title = "Error / log / ticket text"
+        else:
+            title = "Change request analysis"
+            instruction = (
+                "You are an external engineer analyzing a change request. Use the snapshot, current scope, and key files below "
+                "to assess impact, affected areas, implementation plan, risks, and validation steps."
+            )
+            input_title = "Requested change"
+
+    prompt_text = "\n".join([
+        f"# {title}",
+        "",
+        instruction,
+        "",
+        "## Current scope",
+        f"- Snapshot: `{snapshot}`",
+        f"- Proc: `{candidate.proc_name}`",
+        f"- Candidate: `{candidate.display_name}`",
+        f"- Files in scope: {scope['file_count']}",
+        (
+            "- Scope composition: "
+            f"procs {scope['counts']['procs']}, scripts {scope['counts']['scripts']}, "
+            f"controls {scope['counts']['controls']}, inserts {scope['counts']['inserts']}, "
+            f"docdef {scope['counts']['docdef']}"
+        ),
+        "",
+        "## Entry points",
+        *([f"- {line}" for line in scope["read_order"]] or ["- No obvious entry points found"]),
+        "",
+        f"## {input_title}",
+        "```",
+        prompt_input.strip() or "(none provided)",
+        "```",
+        "",
+        "## Files to open",
+        *file_lines,
+        diagram_block,
+        "",
+        "## Expected answer",
+        "- Most probable root cause or main impact area",
+        "- Evidence from the provided files and input",
+        "- Affected files and why they matter",
+        "- Verification checklist",
+        "- Proposed fix or change plan",
+    ])
+    return {
+        "prompt_text": prompt_text,
+        "scope_summary": scope,
+        "mermaid_code": mermaid_code,
+    }
+
 @app.post("/api/prompt")
 async def generate_prompt(req: PromptRequest):
     snapshot = _get_snapshot()
+
+    if req.scenario:
+        if not _last_candidates:
+            raise HTTPException(400, "No plan generated yet.")
+        idx = req.candidate_index
+        if idx < 0 or idx >= len(_last_candidates):
+            raise HTTPException(400, "candidate_index out of range")
+        candidate = _last_candidates[idx]
+        scenario = req.scenario if req.scenario in {"incident", "change_request"} else "incident"
+        payload = _build_scenario_prompt(
+            snapshot,
+            candidate,
+            lang=req.lang,
+            scenario=scenario,
+            prompt_input=req.prompt_input or req.error_text or "",
+            include_diagram=req.include_diagram,
+        )
+        saved_path = None
+        if req.save_prompt:
+            saved_path = _save_prompt_text(snapshot, candidate.proc_name, scenario, payload["prompt_text"])
+        return {
+            "prompt_text": payload["prompt_text"],
+            "saved_path": saved_path,
+            "scope_summary": payload["scope_summary"],
+            "scenario": scenario,
+            "impl_mode": "scope_prompt_v1",
+            "mermaid_included": bool(payload["mermaid_code"]),
+        }
 
     if req.mode == "cursor":
         if not _last_intent or not _last_candidates:
@@ -789,55 +1056,254 @@ def _workspace_create_stream(
 
 # --- API: Search ---
 
+def _search_kind_clause(kind: str) -> tuple[str, tuple[Any, ...]]:
+    """Map UI kind filter to SQL clause."""
+    kind = (kind or "all").lower()
+    if kind == "all":
+        return "", ()
+    if kind == "scripts":
+        return " AND a.kind IN (?, ?)", ("script", "master")
+    mapping = {
+        "procs": ("procs",),
+        "controls": ("control",),
+        "inserts": ("insert",),
+        "docdef": ("docdef",),
+        "logs": ("logs_inbox",),
+        "refs": ("refs",),
+    }
+    values = mapping.get(kind)
+    if not values:
+        return "", ()
+    placeholders = ", ".join("?" for _ in values)
+    return f" AND a.kind IN ({placeholders})", tuple(values)
+
+
+def _current_scope_paths(snapshot: Path, candidate_index: int) -> set[str]:
+    """Return the current candidate's file paths if a plan is available."""
+    if not _last_candidates:
+        return set()
+    if candidate_index < 0 or candidate_index >= len(_last_candidates):
+        return set()
+    return {str((snapshot / f.path).resolve().relative_to(snapshot.resolve())) for f in _last_candidates[candidate_index].files}
+
+
+def _search_message_codes(conn: sqlite3.Connection, query: str, limit: int) -> list[dict]:
+    """Search imported message codes from PDF knowledge base."""
+    pattern = f"%{query}%"
+    rows = conn.execute(
+        """
+        SELECT code, severity, title, body, source_path
+        FROM message_codes
+        WHERE code LIKE ? OR title LIKE ? OR body LIKE ?
+        ORDER BY CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code
+        LIMIT ?
+        """,
+        (pattern, pattern, pattern, pattern, limit),
+    ).fetchall()
+    return [
+        {
+            "path": f"message_codes/{row['code']}",
+            "kind": "message_code",
+            "snippet": row["body"][:180] if row["body"] else row["title"],
+            "match_type": "knowledge",
+            "preview_title": f"{row['code']} ({row['severity']})",
+            "preview_content": "\n".join(filter(None, [
+                f"Code: {row['code']}",
+                f"Severity: {row['severity']}",
+                f"Title: {row['title']}" if row["title"] else None,
+                "",
+                row["body"],
+                "",
+                f"Source PDF: {row['source_path']}",
+            ])),
+        }
+        for row in rows
+    ]
+
+
+def _search_case_cards(conn: sqlite3.Connection, query: str, limit: int) -> list[dict]:
+    """Search imported incident history case cards."""
+    pattern = f"%{query}%"
+    rows = conn.execute(
+        """
+        SELECT id, source_path, title, root_cause, fix_summary, updated_at, created_at
+        FROM case_cards
+        WHERE source_path LIKE ?
+           OR title LIKE ?
+           OR root_cause LIKE ?
+           OR fix_summary LIKE ?
+        ORDER BY COALESCE(updated_at, created_at) DESC
+        LIMIT ?
+        """,
+        (pattern, pattern, pattern, pattern, limit),
+    ).fetchall()
+    return [
+        {
+            "path": f"case_cards/{row['id']}",
+            "kind": "case_card",
+            "snippet": row["root_cause"] or row["fix_summary"] or row["title"] or row["source_path"],
+            "match_type": "knowledge",
+            "preview_title": row["title"] or f"Case card {row['id']}",
+            "preview_content": "\n".join(filter(None, [
+                f"Source: {row['source_path']}" if row["source_path"] else None,
+                f"Updated: {row['updated_at'] or row['created_at']}",
+                "",
+                f"Title: {row['title']}" if row["title"] else None,
+                f"Root cause: {row['root_cause']}" if row["root_cause"] else None,
+                f"Fix summary: {row['fix_summary']}" if row["fix_summary"] else None,
+            ])),
+        }
+        for row in rows
+    ]
+
+
 @app.get("/api/search")
-async def search(q: str = Query(..., min_length=1), limit: int = Query(20, ge=1, le=100)):
+async def search(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(20, ge=1, le=100),
+    mode: str = Query("content"),
+    scope: str = Query("snapshot"),
+    kind: str = Query("all"),
+    space: str = Query("all"),
+    candidate_index: int = Query(0, ge=0),
+):
     """Search artifacts by path and content."""
     snapshot = _get_snapshot()
     conn = _open_connection(snapshot)
     try:
-        results = _search_fts(conn, q, limit)
-        if not results:
-            results = _search_like(conn, q, limit)
+        scope_paths = _current_scope_paths(snapshot, candidate_index) if scope == "current" else set()
+        file_results: list[dict[str, Any]] = []
+        knowledge_results: list[dict[str, Any]] = []
+
+        if space in {"all", "files"}:
+            if mode == "path":
+                file_results = _search_path_only(conn, q, limit, kind=kind, scope_paths=scope_paths)
+            else:
+                file_results = _search_fts(conn, q, limit, kind=kind, scope_paths=scope_paths)
+                if not file_results:
+                    file_results = _search_like(conn, q, limit, kind=kind, scope_paths=scope_paths)
+
+        if space in {"all", "knowledge"}:
+            knowledge_results = _search_message_codes(conn, q, limit) + _search_case_cards(conn, q, limit)
+
+        if space == "files":
+            results = file_results[:limit]
+        elif space == "knowledge":
+            results = knowledge_results[:limit]
+        else:
+            knowledge_limit = max(5, limit // 2)
+            file_limit = max(5, limit - knowledge_limit)
+            results = [*knowledge_results[:knowledge_limit], *file_results[:file_limit]][:limit]
         return results
     finally:
         conn.close()
 
 
-def _search_fts(conn: sqlite3.Connection, query: str, limit: int) -> list[dict]:
+def _search_fts(
+    conn: sqlite3.Connection,
+    query: str,
+    limit: int,
+    *,
+    kind: str = "all",
+    scope_paths: set[str] | None = None,
+) -> list[dict]:
     """Full-text search using FTS5 virtual table."""
     try:
+        kind_clause, kind_params = _search_kind_clause(kind)
+        params: list[Any] = [query]
+        scope_clause = ""
+        if scope_paths:
+            placeholders = ", ".join("?" for _ in scope_paths)
+            scope_clause = f" AND a.path IN ({placeholders})"
+            params.extend(sorted(scope_paths))
+        params.extend(kind_params)
+        params.append(limit)
         rows = conn.execute(
-            """
+            f"""
             SELECT a.path, a.kind,
                    snippet(artifacts_fts, 1, '>>>', '<<<', '...', 30) as snippet
             FROM artifacts_fts
             JOIN artifacts a ON artifacts_fts.rowid = a.id
             WHERE artifacts_fts MATCH ?
+            {scope_clause}
+            {kind_clause}
             LIMIT ?
             """,
-            (query, limit),
+            tuple(params),
         ).fetchall()
-        return [{"path": r["path"], "kind": r["kind"], "snippet": r["snippet"]} for r in rows]
+        return [{"path": r["path"], "kind": r["kind"], "snippet": r["snippet"], "match_type": "content"} for r in rows]
     except Exception:
         return []
 
 
-def _search_like(conn: sqlite3.Connection, query: str, limit: int) -> list[dict]:
+def _search_like(
+    conn: sqlite3.Connection,
+    query: str,
+    limit: int,
+    *,
+    kind: str = "all",
+    scope_paths: set[str] | None = None,
+) -> list[dict]:
     """Fallback LIKE search on paths and content."""
     pattern = f"%{query}%"
+    kind_clause, kind_params = _search_kind_clause(kind)
+    params: list[Any] = [pattern, pattern]
+    scope_clause = ""
+    if scope_paths:
+        placeholders = ", ".join("?" for _ in scope_paths)
+        scope_clause = f" AND path IN ({placeholders})"
+        params.extend(sorted(scope_paths))
+    params.extend(kind_params)
+    params.extend([pattern, limit])
     rows = conn.execute(
-        """
+        f"""
         SELECT path, kind, substr(text_content, 1, 100) as snippet
         FROM artifacts
-        WHERE path LIKE ? OR text_content LIKE ?
+        WHERE (path LIKE ? OR text_content LIKE ?)
+        {scope_clause}
+        {kind_clause.replace('a.kind', 'kind')}
         ORDER BY
             CASE WHEN path LIKE ? THEN 0 ELSE 1 END,
             path
         LIMIT ?
         """,
-        (pattern, pattern, pattern, limit),
+        tuple(params),
     ).fetchall()
-    return [{"path": r["path"], "kind": r["kind"], "snippet": r["snippet"]} for r in rows]
+    return [{"path": r["path"], "kind": r["kind"], "snippet": r["snippet"], "match_type": "content"} for r in rows]
+
+
+def _search_path_only(
+    conn: sqlite3.Connection,
+    query: str,
+    limit: int,
+    *,
+    kind: str = "all",
+    scope_paths: set[str] | None = None,
+) -> list[dict]:
+    """Search only on artifact paths."""
+    pattern = f"%{query}%"
+    kind_clause, kind_params = _search_kind_clause(kind)
+    params: list[Any] = [pattern]
+    scope_clause = ""
+    if scope_paths:
+        placeholders = ", ".join("?" for _ in scope_paths)
+        scope_clause = f" AND path IN ({placeholders})"
+        params.extend(sorted(scope_paths))
+    params.extend(kind_params)
+    params.append(limit)
+    rows = conn.execute(
+        f"""
+        SELECT path, kind, substr(path, 1, 120) as snippet
+        FROM artifacts
+        WHERE path LIKE ?
+        {scope_clause}
+        {kind_clause.replace('a.kind', 'kind')}
+        ORDER BY path
+        LIMIT ?
+        """,
+        tuple(params),
+    ).fetchall()
+    return [{"path": r["path"], "kind": r["kind"], "snippet": r["snippet"], "match_type": "path"} for r in rows]
 
 
 # --- API: Stats ---

@@ -59,6 +59,12 @@ lsa serve /path/to/snapshot
 
 The web UI provides snapshot management, file search, AI prompt generation, and workspace creation — all from the browser at `http://127.0.0.1:18900`.
 
+The current V1 web UI is an operator console:
+- **Current scope** is the main work surface after bundle selection
+- one action row drives the core flow: open files, create workspace, copy file list, generate prompt, open diagram
+- search distinguishes `Files` vs `Knowledge` vs `All`, with `Path`/`Content` and `Current scope`/`Whole snapshot`
+- Papyrus/PDF message codes are searchable from the same UI, including mixed `All` searches
+
 ## What You Get
 
 When you run `lsa explain`, you get a single block of text containing:

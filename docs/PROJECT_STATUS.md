@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-03-24
+**Last Updated:** 2026-03-25
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -59,15 +59,44 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 ### Web UI (`lsa serve`)
 - [x] Snapshot management: list, select, create (rsync from RHS), delete with confirmation
 - [x] SSE progress bars for snapshot creation and workspace creation
-- [x] Bundle: plan generation, candidate selection, file preview, Mermaid graph
-- [x] Prompt: cursor/deep/explain modes, error text, language toggle, copy to clipboard
+- [x] Operator-console V1: Overview is centered on **Current scope** instead of index statistics
+- [x] Bundle: plan generation, candidate selection, Current scope summary, file preview, Mermaid graph
+- [x] Current scope actions: Open files, Create workspace, Copy file list, Generate prompt, Open diagram
+- [x] Bundle action deduplication: one clear entry point per function, duplicate workspace/diagram/prompt surfaces removed
+- [x] Prompt: generated from the selected Current scope with two scenarios only:
+  - Incident analysis
+  - Change request analysis
+- [x] Search is operator-oriented:
+  - Space: All / Files / Knowledge
+  - Mode: Path / Content
+  - Scope: Current scope / Whole snapshot
+  - Kind filters for artifact types
+- [x] Knowledge search includes Papyrus/PDF message codes in Search, including `space=all` with `scope=current`
+- [x] Snapshot creation supports optional enrichments via progressive disclosure:
+  - control / prox / insert / related files
+  - Papyrus PDF
+  - incidents folder
+  - research/log files folder
 - [x] Workspace creation: snap/SSH copy modes, pull script generation
-- [x] Context pages: Overview (stats), Search (FTS5)
+- [x] Diagnostics keeps secondary counters out of the main operator surface
 - [x] Light theme (OpenClaw-inspired: Inter + JetBrains Mono, teal accent)
 - [x] WSL support: Windows Explorer paths (`\\wsl.localhost\...`) with copy-to-clipboard
+- [x] Live smoke-tested flow after server restart/reload:
+  - snapshot select
+  - bundle/scope selection
+  - open file
+  - create workspace
+  - copy file list
+  - generate prompt
+  - open diagram
+  - search Papyrus/PDF message codes
 
 ### Tests
-- [x] 147 tests passing (as of 2026-03-24)
+- [x] Core Python test suite remains in place
+- [x] Web regression tests cover:
+  - `server.py` bootstrap and API behavior
+  - `app.js` syntax parse check (`node --check`, when Node is available)
+  - Search regression: `space=all` + `scope=current` must keep knowledge hits
 - [x] test_wrapper_noise.py
 - [x] test_message_codes.py
 - [x] test_external_signals.py
@@ -185,6 +214,10 @@ Strengthen case_cards as a solutions knowledge base:
 ### Other Ideas
 - [ ] `lsa export` — export context pack to file (for automation)
 - [ ] `lsa plan --lang zh` — add more languages as needed
+- [ ] Web UI V2:
+  - stronger persistence across restart/reload for selected snapshot/scope
+  - richer knowledge navigation beyond Files / Knowledge / All
+  - dark mode only if it stays nearly free
 
 ---
 
@@ -202,6 +235,8 @@ Strengthen case_cards as a solutions knowledge base:
    lsa import-codes "$SNAP"
    lsa import-histories "$SNAP"
    ```
+
+3. **Current scope is not persisted across restart/reload** — after restarting `lsa serve` or reloading the page, reselect the snapshot and run `Find scope` again. This is a known V1 limitation, not a backend failure.
 
 ---
 

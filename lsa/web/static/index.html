@@ -6,22 +6,37 @@
   <title>LSA Web UI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <div class="shell">
     <header class="topbar">
       <div class="topbar-brand">
-        <span class="topbar-logo">LSA</span>
-        <span class="topbar-subtitle">Legacy Script Archaeologist</span>
+        <div class="topbar-mark">
+          <span class="topbar-logo">LSA</span>
+          <span class="topbar-build">Operator Workbench</span>
+        </div>
+        <div class="topbar-titleblock">
+          <span class="topbar-subtitle">Legacy Script Archaeologist</span>
+          <span class="topbar-context">snapshot-first analysis console</span>
+        </div>
       </div>
       <div class="topbar-right">
+        <div class="topbar-status">
+          <span class="topbar-chip">fastapi</span>
+          <span class="topbar-chip">static-spa</span>
+          <span class="topbar-chip">indexed mode</span>
+        </div>
         <span class="topbar-snap" id="current-snap">No snapshot selected</span>
       </div>
     </header>
 
     <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Workbench</div>
+        <div class="sidebar-subtitle">Acquisition, triage, and prompt assembly</div>
+      </div>
       <div class="nav-section">
         <div class="nav-section-title">Pipeline</div>
         <div class="step active" data-step="snapshot">Snapshot</div>
@@ -29,9 +44,14 @@
         <div class="step" data-step="prompt">Prompt</div>
       </div>
       <div class="nav-section">
-        <div class="nav-section-title">Context</div>
+        <div class="nav-section-title">Inspect</div>
         <div class="step" data-step="stats">Overview</div>
         <div class="step" data-step="search">Search</div>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-label">Active snapshot</div>
+        <div class="sidebar-footer-value" id="current-snap-sidebar">none</div>
+        <div class="sidebar-footer-meta">Select a scope to unlock prompt and scope-aware search.</div>
       </div>
     </nav>
 
