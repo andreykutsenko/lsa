@@ -94,12 +94,21 @@ Instead of the command line, you can use the browser-based interface:
 lsa serve $SNAP
 ```
 
-This opens a web UI at `http://127.0.0.1:18900` with:
-- **Snapshot** — list, select, create new snapshots (rsync from production), delete
-- **Bundle** — find related files, preview, create workspaces
-- **Prompt** — generate AI prompts (cursor/deep/explain), copy to clipboard
+This opens a web UI at `http://127.0.0.1:18900`.
+
+Recommended operator flow:
+- **Snapshot** — select an existing snapshot or create a new one
+- **Bundle** — run `Find scope`, choose the best candidate, then use **Current scope**
+- **Current scope actions** — `Open files`, `Create workspace`, `Copy file list`, `Generate prompt`, `Open diagram`
+- **Search** — switch between `Files`, `Knowledge`, or `All`; use `Path` vs `Content`; choose `Current scope` vs `Whole snapshot`
+
+Prompt generation in the web UI supports two scenarios:
+- `Incident analysis`
+- `Change request analysis`
 
 > On WSL, created snapshots and workspaces show a clickable Windows Explorer path.
+>
+> After restarting `lsa serve` or reloading the page, reselect the snapshot and run `Find scope` again. Current scope is not persisted across restarts in V1.
 
 ---
 
