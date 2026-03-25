@@ -1,6 +1,6 @@
 # LSA — Legacy Script Archaeologist
 
-Local CLI tool for analyzing legacy batch system snapshots. Scans script directories, builds execution graphs, matches logs to processes, and generates "context packs" — structured summaries that can be pasted into an IDE or LLM for deeper investigation.
+CLI toolkit with a browser-based operator console for analyzing legacy batch system snapshots. LSA scans script directories, builds execution graphs, matches logs to processes, searches both files and imported knowledge, and generates structured prompts/context packs for deeper investigation.
 
 ## Why This Exists
 
@@ -14,6 +14,7 @@ LSA automates this preprocessing step:
 - Scans snapshot directories and builds a searchable execution graph
 - Parses trace logs and matches them to probable failing processes
 - Detects external configuration signals (not code bugs) vs actual script failures
+- Provides a browser-based operator console centered on the current file scope
 - Generates a single copy-paste "context pack" with hypotheses and related files
 - Tracks analyzed incidents and similar past cases
 
@@ -105,6 +106,32 @@ uv sync --dev
 source .venv/bin/activate
 pytest
 ```
+
+## Web UI
+
+LSA also ships with a browser-based operator console:
+
+```bash
+lsa serve
+```
+
+Then select an existing snapshot or create a new one in the browser UI.
+
+The V1 web UI is centered on **Current scope** after bundle selection:
+- `Open files`
+- `Create workspace`
+- `Copy file list`
+- `Generate prompt`
+- `Open diagram`
+
+Search is operator-oriented:
+- `Files` / `Knowledge` / `All`
+- `Path` / `Content`
+- `Current scope` / `Whole snapshot`
+
+Imported Papyrus/PDF message codes are searchable from the same UI alongside file results.
+
+If you already know the snapshot path, `lsa serve "$SNAP"` still works, but `lsa serve` is the primary operator flow.
 
 ## Snapshot Workflow
 
