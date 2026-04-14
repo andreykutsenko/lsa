@@ -15,13 +15,18 @@ PROCS_APP_TYPE = re.compile(
 PROCS_JOB_ID = re.compile(r"Job ID:\s*(\S+)", re.MULTILINE)
 PROCS_LR = re.compile(r"LR:\s*(\S+)", re.MULTILINE)
 
-# Processing fields (with __ prefix)
+# Processing fields (tolerate `__`, `-`, or leading whitespace as label prefix)
 PROCS_SHELL_SCRIPT = re.compile(
-    r"__(?:Processing\s+)?Shell Script:\s*(/\S+)", re.MULTILINE | re.IGNORECASE
+    r"^[\s_\-]*(?:Processing\s+)?Shell Script:\s*(/\S+)",
+    re.MULTILINE | re.IGNORECASE,
 )
-PROCS_LOG_FILE = re.compile(r"__Log File:\s*(/\S+)", re.MULTILINE | re.IGNORECASE)
+PROCS_LOG_FILE = re.compile(
+    r"^[\s_\-]*Log File:\s*(/\S+)",
+    re.MULTILINE | re.IGNORECASE,
+)
 PROCS_FILE_SETUP = re.compile(
-    r"__File Setup Before Processing:\s*(/\S+)", re.MULTILINE | re.IGNORECASE
+    r"^[\s_\-]*File Setup Before Processing:\s*\n?\s*(/\S+)",
+    re.MULTILINE | re.IGNORECASE,
 )
 
 # File references
