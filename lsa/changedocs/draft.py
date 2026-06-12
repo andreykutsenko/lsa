@@ -24,14 +24,25 @@ MODELS = {
     "opus": "claude-opus-4-8",
 }
 DEFAULT_MODEL = "sonnet"
+DEFAULT_OPENAI_MODEL = "gpt-4o"
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 MAX_OUTPUT_TOKENS = 4000
 
 # Approximate USD per 1M tokens. ESTIMATE ONLY — verify against current pricing.
 # Real spend is taken from the API response usage and written to usage.log.
+# Unknown models (e.g. arbitrary OpenAI-compatible ids) have no estimate.
 PRICE_PER_MTOK = {
     "claude-sonnet-4-6": {"in": 3.0, "out": 15.0},
-    "claude-opus-4-8": {"in": 15.0, "out": 75.0},
+    "claude-opus-4-8": {"in": 5.0, "out": 25.0},
 }
+
+
+def _resolve_model(provider, model):
+    """Map a UI model choice to the provider's concrete model id."""
+    if provider == "openai":
+        chosen = (model or "").strip()
+        return chosen if chosen and chosen not in MODELS else DEFAULT_OPENAI_MODEL
+    return MODELS.get(model, MODELS[DEFAULT_MODEL])
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 SYSTEM_PROMPT_PATH = os.path.join(_HERE, "prompts", "system_cab.md")
@@ -96,13 +107,16 @@ def estimate_tokens(text):
 
 
 def _estimate_cost(model_id, in_tokens, out_tokens):
-    price = PRICE_PER_MTOK.get(model_id, {"in": 0.0, "out": 0.0})
+    price = PRICE_PER_MTOK.get(model_id)
+    if price is None:
+        return None
     return (in_tokens * price["in"] + out_tokens * price["out"]) / 1_000_000
 
 
-def dry_run(context_prompt, model="sonnet", detail="concise", extra_context=""):
+def dry_run(context_prompt, model="sonnet", detail="concise", extra_context="",
+            provider="anthropic"):
     """Return what would be sent and an estimated cost; make no API call."""
-    model_id = MODELS.get(model, MODELS[DEFAULT_MODEL])
+    model_id = _resolve_model(provider, model)
     context_prompt = context_prompt + _extra_block(extra_context) + _style_suffix(detail)
     system = _load_system_prompt()
     system_tokens = estimate_tokens(system)
@@ -120,13 +134,15 @@ def dry_run(context_prompt, model="sonnet", detail="concise", extra_context=""):
     }
 
 
-def _log_usage(model_id, files, usage, usage_log_path=USAGE_LOG_PATH):
-    line = "{ts}\tmodel={model}\tin={inp}\tout={out}\test_usd={cost:.4f}\tfiles={files}\n".format(
+def _log_usage(model_id, files, usage, usage_log_path=USAGE_LOG_PATH, provider="anthropic"):
+    cost = _estimate_cost(model_id, usage.get("input_tokens", 0), usage.get("output_tokens", 0))
+    line = "{ts}\tmodel={provider}:{model}\tin={inp}\tout={out}\test_usd={cost:.4f}\tfiles={files}\n".format(
         ts=datetime.datetime.now().isoformat(timespec="seconds"),
+        provider=provider,
         model=model_id,
         inp=usage.get("input_tokens", 0),
         out=usage.get("output_tokens", 0),
-        cost=_estimate_cost(model_id, usage.get("input_tokens", 0), usage.get("output_tokens", 0)),
+        cost=cost if cost is not None else 0.0,
         files=",".join(files),
     )
     log_path = Path(usage_log_path)
@@ -142,14 +158,96 @@ def _parse_json(text):
     return json.loads(text)
 
 
+def _openai_chat(base_url, api_key, model_id, system, user_text):
+    """One OpenAI-compatible chat-completions call → (raw_text, in_tok, out_tok)."""
+    import httpx
+
+    url = (base_url or DEFAULT_OPENAI_BASE_URL).rstrip("/") + "/chat/completions"
+    try:
+        resp = httpx.post(
+            url,
+            headers={"Authorization": "Bearer {}".format(api_key)},
+            json={
+                "model": model_id,
+                "max_tokens": MAX_OUTPUT_TOKENS,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_text},
+                ],
+            },
+            timeout=300.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except httpx.HTTPStatusError as e:
+        raise DraftError("OpenAI-compatible API call failed: HTTP {} — {}".format(
+            e.response.status_code, e.response.text[:300]))
+    except httpx.HTTPError as e:
+        raise DraftError("OpenAI-compatible API call failed: {}".format(e))
+
+    try:
+        raw = data["choices"][0]["message"]["content"] or ""
+    except (KeyError, IndexError, TypeError):
+        raise DraftError("Unexpected response shape from the OpenAI-compatible API.")
+    usage = data.get("usage") or {}
+    return raw, int(usage.get("prompt_tokens") or 0), int(usage.get("completion_tokens") or 0)
+
+
+def _draft_cab_openai(context, model_id, system, user_text, api_key, base_url,
+                      usage_log_path):
+    """OpenAI-compatible drafting path: same single-call + one repair retry."""
+    api_key = api_key or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise DraftError(
+            "No API key provided for the OpenAI-compatible provider. Enter one in "
+            "the Change Docs panel or set OPENAI_API_KEY."
+        )
+
+    usage = {"input_tokens": 0, "output_tokens": 0}
+
+    def _invoke(extra=""):
+        raw, in_tok, out_tok = _openai_chat(base_url, api_key, model_id, system,
+                                            user_text + extra)
+        usage["input_tokens"] += in_tok
+        usage["output_tokens"] += out_tok
+        return raw
+
+    try:
+        raw = _invoke()
+        try:
+            content = _parse_json(raw)
+        except json.JSONDecodeError:
+            raw = _invoke("\n\nReturn ONLY the JSON object, no other text.")
+            try:
+                content = _parse_json(raw)
+            except json.JSONDecodeError:
+                raise DraftError("Model returned malformed JSON twice; not retrying further.")
+    finally:
+        if usage["input_tokens"] or usage["output_tokens"]:
+            _log_usage(model_id, [d["file"] for d in context["diffs"]], usage,
+                       usage_log_path=usage_log_path, provider="openai")
+
+    if "sections" not in content:
+        raise DraftError("Model output missing 'sections'.")
+    return content
+
+
 def draft_cab(context, model="sonnet", usage_log_path=USAGE_LOG_PATH, api_key=None,
-              detail="concise", extra_context=""):
+              detail="concise", extra_context="", provider="anthropic", base_url=None):
     """Single bounded API call. Returns the CAB content dict for generate_cab.
 
     The key is taken from the explicit `api_key` argument when provided,
-    otherwise from the ANTHROPIC_API_KEY environment variable. It is never
-    logged or persisted.
+    otherwise from the provider's environment variable. It is never logged or
+    persisted.
     """
+    model_id = _resolve_model(provider, model)
+    system = _load_system_prompt()
+    user_text = to_prompt(context) + _extra_block(extra_context) + _style_suffix(detail)
+
+    if provider == "openai":
+        return _draft_cab_openai(context, model_id, system, user_text, api_key,
+                                 base_url, usage_log_path)
+
     try:
         import anthropic
     except ImportError:
@@ -160,10 +258,6 @@ def draft_cab(context, model="sonnet", usage_log_path=USAGE_LOG_PATH, api_key=No
         raise DraftError(
             "No API key provided. Enter one in the Change Docs panel or set ANTHROPIC_API_KEY."
         )
-
-    model_id = MODELS.get(model, MODELS[DEFAULT_MODEL])
-    system = _load_system_prompt()
-    user_text = to_prompt(context) + _extra_block(extra_context) + _style_suffix(detail)
 
     client = anthropic.Anthropic(api_key=api_key)
     system_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]

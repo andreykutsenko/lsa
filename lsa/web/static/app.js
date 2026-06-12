@@ -22,14 +22,18 @@ const state = {
   bundleForm: { title: '', cid: '', jobid: '', limit: 5 },
   promptInput: '',
   changeDocs: {
+    provider: 'anthropic',
     model: 'sonnet',
+    openaiModel: '',
     detail: 'concise',
     extraContext: '',
     apiKey: '',
     keyStatus: null,
     keyEditing: false,
+    cab: true,
     ptf: false,
     qa: false,
+    outDir: null,
     preview: null,
     result: null,
   },
@@ -1432,12 +1436,27 @@ function renderChangeDocsStep(el) {
             <div class="field-error" id="cd-prid-error" hidden></div>
           </div>
           <div class="field">
+            <label>Provider</label>
+            <select id="cd-provider">
+              <option value="anthropic" ${cd.provider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude)</option>
+              <option value="openai" ${cd.provider === 'openai' ? 'selected' : ''}>OpenAI-compatible</option>
+            </select>
+          </div>
+          ${cd.provider === 'openai' ? `
+          <div class="field">
+            <label>Model id</label>
+            <input type="text" id="cd-openai-model" placeholder="e.g. gpt-4o" value="${escapeHtml(cd.openaiModel ?? '')}">
+            <div class="field-help">Base URL via changedocs.openai_base_url in ~/.lsa/config.yaml (default api.openai.com).</div>
+          </div>
+          ` : `
+          <div class="field">
             <label>Model</label>
             <select id="cd-model">
               <option value="sonnet" ${cd.model === 'sonnet' ? 'selected' : ''}>Sonnet (default)</option>
               <option value="opus" ${cd.model === 'opus' ? 'selected' : ''}>Opus</option>
             </select>
           </div>
+          `}
           <div class="field">
             <label>Detail</label>
             <select id="cd-detail">
@@ -1449,9 +1468,10 @@ function renderChangeDocsStep(el) {
         <div class="field" id="cd-key-block">${renderChangeDocsKeyBlock(cd)}</div>
         <div class="field">
           <label>Documents</label>
-          <label class="checkbox-row"><input type="checkbox" checked disabled><span>CAB Questionnaire (always generated, uses Claude API)</span></label>
+          <label class="checkbox-row"><input type="checkbox" id="cd-cab" ${cd.cab ? 'checked' : ''}><span>CAB Questionnaire (drafted via LLM API)</span></label>
           <label class="checkbox-row"><input type="checkbox" id="cd-ptf" ${cd.ptf ? 'checked' : ''}><span>PTF (deterministic, no API)</span></label>
           <label class="checkbox-row"><input type="checkbox" id="cd-qa" ${cd.qa ? 'checked' : ''}><span>QA Checklist (deterministic, no API)</span></label>
+          <div class="field-error" id="cd-docs-error" hidden></div>
         </div>
         <div id="cd-ptf-fields" ${cd.ptf ? '' : 'hidden'}>
           <div class="layout-grid layout-grid--split">
@@ -1487,6 +1507,14 @@ function renderChangeDocsStep(el) {
             <input type="file" id="cd-extra-file" accept=".txt,.md,.log,.diff,.json,.csv" hidden>
           </div>
         </div>
+        <div class="field">
+          <label>Output folder</label>
+          <input type="text" id="cd-outdir" placeholder="/mnt/c/Users/you/Documents/ChangeDocs" value="${escapeHtml(cd.outDir?.out_dir ?? '')}">
+          <div class="field-help" id="cd-outdir-win">${cd.outDir?.out_dir_win ? `Windows: ${escapeHtml(cd.outDir.out_dir_win)}` : ''}</div>
+          <div class="btn-row">
+            <button class="btn btn--sm" id="cd-outdir-save">Save folder</button>
+          </div>
+        </div>
         <div class="btn-row">
           <button class="btn" id="cd-preview">Preview (no API call)</button>
           <button class="btn btn--primary" id="cd-generate">Generate</button>
@@ -1497,17 +1525,36 @@ function renderChangeDocsStep(el) {
     <div id="cd-preview-out">${cd.preview ? renderChangeDocsPreview(cd.preview) : ''}</div>
     <div id="cd-result-out">${cd.result ? renderChangeDocsResult(cd.result) : ''}</div>`;
 
+  document.getElementById('cd-provider').addEventListener('change', e => {
+    cd.provider = e.target.value;
+    cd.keyStatus = null;
+    cd.keyEditing = false;
+    renderChangeDocsStep(el);
+  });
+  document.getElementById('cd-cab').addEventListener('change', e => {
+    cd.cab = e.target.checked;
+    const errEl = document.getElementById('cd-docs-error');
+    if (errEl) errEl.hidden = true;
+  });
   document.getElementById('cd-ptf').addEventListener('change', e => {
     cd.ptf = e.target.checked;
     document.getElementById('cd-ptf-fields').hidden = !cd.ptf;
+    const errEl = document.getElementById('cd-docs-error');
+    if (errEl) errEl.hidden = true;
   });
   document.getElementById('cd-qa').addEventListener('change', e => {
     cd.qa = e.target.checked;
     document.getElementById('cd-qa-fields').hidden = !cd.qa;
+    const errEl = document.getElementById('cd-docs-error');
+    if (errEl) errEl.hidden = true;
   });
-  document.getElementById('cd-model').addEventListener('change', e => {
+  document.getElementById('cd-model')?.addEventListener('change', e => {
     cd.model = e.target.value;
   });
+  document.getElementById('cd-openai-model')?.addEventListener('input', e => {
+    cd.openaiModel = e.target.value;
+  });
+  document.getElementById('cd-outdir-save').addEventListener('click', () => changeDocsOutDirSave());
   document.getElementById('cd-detail').addEventListener('change', e => {
     cd.detail = e.target.value;
   });
@@ -1542,19 +1589,57 @@ function renderChangeDocsStep(el) {
   document.getElementById('cd-generate').addEventListener('click', () => changeDocsGenerate());
   _wireChangeDocsKeyBlock();
   loadChangeDocsKeyStatus();
+  loadChangeDocsOutDir();
+  if (cd.result) bindChangeDocsResult(document.getElementById('cd-result-out'));
+}
+
+async function loadChangeDocsOutDir() {
+  const cd = state.changeDocs;
+  try {
+    cd.outDir = await api('GET', '/api/changedocs/outdir');
+  } catch {
+    cd.outDir = null;
+    return;
+  }
+  const input = document.getElementById('cd-outdir');
+  if (input && !input.value) input.value = cd.outDir.out_dir ?? '';
+  const hint = document.getElementById('cd-outdir-win');
+  if (hint && cd.outDir.out_dir_win) hint.textContent = `Windows: ${cd.outDir.out_dir_win}`;
+}
+
+async function changeDocsOutDirSave() {
+  const cd = state.changeDocs;
+  const value = document.getElementById('cd-outdir')?.value.trim() ?? '';
+  if (!value) { toast('Enter an output folder path'); return; }
+  try {
+    cd.outDir = await api('POST', '/api/changedocs/outdir', { out_dir: value });
+    const hint = document.getElementById('cd-outdir-win');
+    if (hint) hint.textContent = cd.outDir.out_dir_win ? `Windows: ${cd.outDir.out_dir_win}` : '';
+    toast('Output folder saved');
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function changeDocsKeyLabel(cd) {
+  return cd.provider === 'openai' ? 'API key (OpenAI-compatible)' : 'Anthropic API key';
 }
 
 function renderChangeDocsKeyBlock(cd) {
   const st = cd.keyStatus;
+  const keyLabel = changeDocsKeyLabel(cd);
+  const envVar = cd.provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
+  const keyFile = cd.provider === 'openai' ? '~/.lsa/openai_key' : '~/.lsa/anthropic_key';
+  const placeholder = cd.provider === 'openai' ? 'sk-…' : 'sk-ant-…';
   if (st === null) {
-    return `<label>Anthropic API key</label><div class="help-line">Checking key status…</div>`;
+    return `<label>${keyLabel}</label><div class="help-line">Checking key status…</div>`;
   }
   if (st.configured && !cd.keyEditing) {
-    const srcLabel = st.source === 'env' ? 'from ANTHROPIC_API_KEY (env)' : 'saved on server';
+    const srcLabel = st.source === 'env' ? `from ${envVar} (env)` : 'saved on server';
     const removeBtn = st.source === 'saved'
       ? `<button class="btn btn--danger btn--sm" id="cd-key-remove">Remove</button>` : '';
     return `
-      <label>Anthropic API key</label>
+      <label>${keyLabel}</label>
       <div class="key-status"><span class="status-dot is-ready"></span>Key configured · ${escapeHtml(st.masked ?? '')} · ${srcLabel}</div>
       <div class="btn-row">
         <button class="btn btn--sm" id="cd-key-change">Change key</button>
@@ -1567,14 +1652,14 @@ function renderChangeDocsKeyBlock(cd) {
     ? ''
     : `<div class="key-status"><span class="status-dot is-warn"></span>No API key yet — paste one and save it to start drafting CABs.</div>`;
   return `
-    <label>Anthropic API key</label>
+    <label>${keyLabel}</label>
     ${prompt}
-    <input type="password" id="cd-api-key" autocomplete="off" placeholder="sk-ant-…">
+    <input type="password" id="cd-api-key" autocomplete="off" placeholder="${placeholder}">
     <div class="btn-row">
       <button class="btn btn--primary btn--sm" id="cd-key-save">Save key</button>
       ${cancelBtn}
     </div>
-    <div class="help-line">Stored on the server in ~/.lsa/anthropic_key (chmod 600). Used automatically afterwards — no need to re-enter it.</div>`;
+    <div class="help-line">Stored on the server in ${keyFile} (chmod 600). Used automatically afterwards — no need to re-enter it.</div>`;
 }
 
 function refreshChangeDocsKeyBlock() {
@@ -1601,7 +1686,7 @@ function _wireChangeDocsKeyBlock() {
 async function loadChangeDocsKeyStatus() {
   const cd = state.changeDocs;
   try {
-    cd.keyStatus = await api('GET', '/api/changedocs/key');
+    cd.keyStatus = await api('GET', `/api/changedocs/key?provider=${encodeURIComponent(cd.provider)}`);
   } catch {
     cd.keyStatus = { configured: false, source: null, masked: null };
   }
@@ -1613,7 +1698,7 @@ async function changeDocsKeySave() {
   const key = document.getElementById('cd-api-key')?.value.trim() ?? '';
   if (!key) { toast('Paste an API key first'); return; }
   try {
-    cd.keyStatus = await api('POST', '/api/changedocs/key', { api_key: key });
+    cd.keyStatus = await api('POST', '/api/changedocs/key', { api_key: key, provider: cd.provider });
     cd.keyEditing = false;
     refreshChangeDocsKeyBlock();
     toast('API key saved');
@@ -1625,7 +1710,7 @@ async function changeDocsKeySave() {
 async function changeDocsKeyRemove() {
   const cd = state.changeDocs;
   try {
-    cd.keyStatus = await api('DELETE', '/api/changedocs/key');
+    cd.keyStatus = await api('DELETE', `/api/changedocs/key?provider=${encodeURIComponent(cd.provider)}`);
     cd.keyEditing = false;
     refreshChangeDocsKeyBlock();
     toast('API key removed');
@@ -1637,10 +1722,15 @@ async function changeDocsKeyRemove() {
 function _readChangeDocsForm() {
   const cd = state.changeDocs;
   cd.prid = document.getElementById('cd-prid').value.trim();
-  cd.model = document.getElementById('cd-model').value;
+  cd.provider = document.getElementById('cd-provider')?.value ?? cd.provider;
+  const modelSelect = document.getElementById('cd-model');
+  if (modelSelect) cd.model = modelSelect.value;
+  const openaiModel = document.getElementById('cd-openai-model');
+  if (openaiModel) cd.openaiModel = openaiModel.value.trim();
   cd.detail = document.getElementById('cd-detail').value;
   cd.extraContext = document.getElementById('cd-extra')?.value ?? '';
   cd.apiKey = document.getElementById('cd-api-key')?.value.trim() ?? '';
+  cd.cab = document.getElementById('cd-cab').checked;
   cd.ptf = document.getElementById('cd-ptf').checked;
   cd.qa = document.getElementById('cd-qa').checked;
   cd.jira = document.getElementById('cd-jira')?.value ?? '';
@@ -1666,13 +1756,17 @@ function _validatePrid(prid) {
   return false;
 }
 
+function _changeDocsModel(cd) {
+  return cd.provider === 'openai' ? cd.openaiModel : cd.model;
+}
+
 async function changeDocsPreview() {
   const cd = _readChangeDocsForm();
   if (!_validatePrid(cd.prid)) return;
   const out = document.getElementById('cd-preview-out');
   setLoading(out, true);
   try {
-    cd.preview = await api('POST', '/api/changedocs/preview', { prid: cd.prid, model: cd.model, detail: cd.detail, extra_context: cd.extraContext });
+    cd.preview = await api('POST', '/api/changedocs/preview', { prid: cd.prid, provider: cd.provider, model: _changeDocsModel(cd), detail: cd.detail, extra_context: cd.extraContext });
     out.innerHTML = renderChangeDocsPreview(cd.preview);
   } catch (err) {
     cd.preview = null;
@@ -1683,6 +1777,14 @@ async function changeDocsPreview() {
 async function changeDocsGenerate() {
   const cd = _readChangeDocsForm();
   if (!_validatePrid(cd.prid)) return;
+  if (!cd.cab && !cd.ptf && !cd.qa) {
+    const errEl = document.getElementById('cd-docs-error');
+    if (errEl) {
+      errEl.textContent = 'Select at least one document (CAB, PTF or QA).';
+      errEl.hidden = false;
+    }
+    return;
+  }
   const out = document.getElementById('cd-result-out');
   setLoading(out, true);
   const qaItems = cd.qaItems
@@ -1691,9 +1793,11 @@ async function changeDocsGenerate() {
   try {
     cd.result = await api('POST', '/api/changedocs/generate', {
       prid: cd.prid,
-      model: cd.model,
+      provider: cd.provider,
+      model: _changeDocsModel(cd),
       detail: cd.detail,
       extra_context: cd.extraContext,
+      cab: cd.cab,
       ptf: cd.ptf,
       qa: cd.qa,
       jira: cd.jira ?? '',
@@ -1704,6 +1808,7 @@ async function changeDocsGenerate() {
       api_key: cd.apiKey || null,
     });
     out.innerHTML = renderChangeDocsResult(cd.result);
+    bindChangeDocsResult(out);
   } catch (err) {
     cd.result = null;
     out.innerHTML = `<div class="inline-error">${escapeHtml(err.message)}</div>`;
@@ -1745,9 +1850,17 @@ function renderChangeDocsResult(result) {
     <section class="section surface surface--raised">
       <div class="section-title">Generated documents</div>
       <div class="help-line">Ticket: ${escapeHtml(result.ticket_id ?? '')} · ${escapeHtml(result.out_dir ?? '')}</div>
+      ${result.out_dir_win ? `<div class="help-line">Explorer: <a href="#" class="ws-open-link" data-cd-outdir-win>${escapeHtml(result.out_dir_win)}</a> (click to copy)</div>` : ''}
       <ul class="download-list">${links}</ul>
       ${result.skipped?.length ? `<div class="help-line">Skipped (not sent): ${escapeHtml(result.skipped.join('; '))}</div>` : ''}
     </section>`;
+}
+
+function bindChangeDocsResult(container) {
+  container.querySelector('[data-cd-outdir-win]')?.addEventListener('click', e => {
+    e.preventDefault();
+    copyToClipboard(state.changeDocs.result?.out_dir_win ?? '');
+  });
 }
 
 document.getElementById('modal-close').addEventListener('click', hideModal);

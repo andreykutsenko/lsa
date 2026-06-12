@@ -139,16 +139,23 @@ Imported Papyrus/PDF message codes are searchable from the same UI alongside fil
 ### Change Docs (CAB / PTF / QA)
 
 The **Change Docs** tab generates change-control documents from a parallel-run
-diff fetched over ssh by PRID:
+diff fetched over ssh by PRID. Each document is selectable independently:
 
-- **CAB Questionnaire** — drafted by the Claude API (single bounded call;
-  a dry-run **Preview** shows context size and worst-case cost before any call)
+- **CAB Questionnaire** — drafted by an LLM (single bounded call; a dry-run
+  **Preview** shows context size and worst-case cost before any call)
 - **PTF** and **QA Checklist** — rendered deterministically from bundled
-  `.docx` templates, no API involved
+  `.docx` templates, no API involved (work without any API key)
 
-Requires an Anthropic API key: paste it once in the UI (stored in
-`~/.lsa/anthropic_key`, chmod 600) or set `ANTHROPIC_API_KEY`. Only
-whitelisted code-extension diffs are sent; client data never leaves the box.
+Two LLM providers: **Anthropic** (Sonnet default, Opus option) or any
+**OpenAI-compatible** endpoint (OpenAI, OpenRouter, Ollama, …; base URL via
+`changedocs.openai_base_url` in `~/.lsa/config.yaml`). Keys are pasted once in
+the UI (stored in `~/.lsa/anthropic_key` / `~/.lsa/openai_key`, chmod 600) or
+taken from `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`. Only whitelisted
+code-extension diffs are sent; client data never leaves the box.
+
+Generated `.docx` files land in a configurable **Output folder** (set it in the
+UI — on WSL a Windows folder like `/mnt/c/Users/you/Documents/ChangeDocs`
+works; the result shows the Explorer path), with a per-ticket subfolder.
 
 The console binds to localhost; state-changing requests from foreign web
 origins are rejected, and all file access is confined to the configured

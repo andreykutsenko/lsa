@@ -138,7 +138,9 @@ def fetch(prid, remote=None):
         'echo "__DIFFS__"; '
         'for d in "$F"/diff/*.diff; do [ -e "$d" ] || continue; '
         'echo "__FILE__ $(basename "$d" .diff)"; cat "$d"; done; '
-        'rm -rf "$F"'
+        # NFS can leave .nfs* lock files behind; a failed cleanup must not
+        # discard an already-successful fetch.
+        'rm -rf "$F" >/dev/null 2>&1 || true'
     ).format(
         script=cfg["script"], csv=cfg["csv"], prid=prid,
         user=cfg["username"], dest=cfg["dest_base"], paths=cfg["paths_json"],

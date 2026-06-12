@@ -16,6 +16,23 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 
 ---
 
+## Done (2026-06-12 session, task: changedocs-fixes-v2)
+
+- [x] ssh context fetch no longer fails when remote cleanup hits NFS lock
+      files (`rm` failure is non-fatal)
+- [x] CAB / PTF / QA selectable independently; PTF/QA-only needs no API key
+- [x] Pluggable LLM provider: Anthropic (default) or any OpenAI-compatible
+      endpoint (`changedocs.openai_base_url`); per-provider key storage
+      (`~/.lsa/anthropic_key` / `~/.lsa/openai_key`)
+- [x] Opus price estimate corrected (5/25 $/MTok)
+- [x] Output folder configurable from the UI (Windows path friendly on WSL),
+      default `~/.lsa/changedocs` — no longer inside snaproot
+- [x] Snapshot table no longer shows non-snapshot directories (the old
+      `changedocs` output dir polluted it)
+- [x] 212 tests passing (+12)
+
+---
+
 ## Done (v0.4.0 — 2026-06-11 session)
 
 All tasks below went through the repo-task-proof-loop workflow: frozen spec,

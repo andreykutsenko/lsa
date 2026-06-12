@@ -1,0 +1,21 @@
+{
+  "task_id": "changedocs-fixes-v2",
+  "date": "2026-06-12",
+  "criteria": {
+    "AC1": { "status": "PASS", "evidence": "rm -rf '$F' >/dev/null 2>&1 || true in remote_cmd; test asserts captured command" },
+    "AC2": { "status": "PASS", "evidence": "cab flag; cab=False skips draft (assert-not-called test); zero docs -> 400; UI checkbox + inline error" },
+    "AC3": { "status": "PASS", "evidence": "provider param, openai chat-completions via httpx, per-provider keys, opus pricing 5/25, dry_run None cost; 7 tests" },
+    "AC4": { "status": "PASS", "evidence": "out_root: setting file -> config -> ~/.lsa; outdir endpoints; snapshots filter; UI folder field + out_dir_win; 3 tests" },
+    "AC5": { "status": "PASS", "evidence": "212 passed full suite, node --check OK" }
+  },
+  "test_counts": { "before": 200, "after": 212, "failed": 0 },
+  "files_changed": [
+    "lsa/changedocs/context.py",
+    "lsa/changedocs/draft.py",
+    "lsa/web/server.py",
+    "lsa/web/static/app.js",
+    "pyproject.toml",
+    "uv.lock",
+    "tests/test_changedocs.py"
+  ]
+}

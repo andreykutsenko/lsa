@@ -150,17 +150,20 @@ class WorkspaceRequest(BaseModel):
 
 class ChangeDocsPreviewRequest(BaseModel):
     prid: str
-    model: str = "sonnet"  # "sonnet" | "opus"
+    provider: str = "anthropic"  # "anthropic" | "openai"
+    model: str = "sonnet"  # anthropic: "sonnet" | "opus"; openai: free-form model id
     detail: str = "concise"  # "concise" | "detailed"
     extra_context: str = ""
 
 
 class ChangeDocsGenerateRequest(BaseModel):
     prid: str
-    model: str = "sonnet"  # "sonnet" | "opus"
+    provider: str = "anthropic"  # "anthropic" | "openai"
+    model: str = "sonnet"  # anthropic: "sonnet" | "opus"; openai: free-form model id
     detail: str = "concise"  # "concise" | "detailed"
     extra_context: str = ""
     ticket_id: str | None = None
+    cab: bool = True
     ptf: bool = False
     qa: bool = False
     jira: str = ""
@@ -173,6 +176,11 @@ class ChangeDocsGenerateRequest(BaseModel):
 
 class ApiKeyRequest(BaseModel):
     api_key: str
+    provider: str = "anthropic"
+
+
+class OutDirRequest(BaseModel):
+    out_dir: str
 
 
 # --- API: Snapshots ---
@@ -189,10 +197,21 @@ async def list_snapshots():
 
     if _snaproot and _snaproot.is_dir():
         for entry in sorted(_snaproot.iterdir()):
-            if entry.is_dir() and entry.resolve() not in seen:
+            if entry.is_dir() and entry.resolve() not in seen and _looks_like_snapshot(entry):
                 results.append(_build_snapshot_info(entry))
 
     return results
+
+
+_SNAPSHOT_MARKER_DIRS = ("procs", "master", "control", "insert", "docdef")
+
+
+def _looks_like_snapshot(path: Path) -> bool:
+    """Filter out non-snapshot dirs in snaproot (e.g. a stray output folder)."""
+    from lsa.config import get_db_path
+    if get_db_path(path).exists():
+        return True
+    return any((path / sub).is_dir() for sub in _SNAPSHOT_MARKER_DIRS)
 
 
 def _build_snapshot_info(snap_dir: Path) -> dict:
@@ -1397,6 +1416,16 @@ async def stats():
 # --- API: Change Docs (CAB / PTF / QA) ---
 
 _ANTHROPIC_KEY_FILE = Path.home() / ".lsa" / "anthropic_key"
+_OPENAI_KEY_FILE = Path.home() / ".lsa" / "openai_key"
+_KEY_ENV_VARS = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
+
+
+def _key_file(provider: str) -> Path:
+    if provider == "anthropic":
+        return _ANTHROPIC_KEY_FILE
+    if provider == "openai":
+        return _OPENAI_KEY_FILE
+    raise HTTPException(400, f"Unknown provider: {provider}")
 
 
 def _mask_api_key(key: str) -> str:
@@ -1406,58 +1435,61 @@ def _mask_api_key(key: str) -> str:
     return f"{key[:7]}…{key[-4:]}"
 
 
-def _load_saved_api_key() -> str | None:
-    """Read the persisted Anthropic key from ~/.lsa/anthropic_key, if present."""
+def _load_saved_api_key(provider: str = "anthropic") -> str | None:
+    """Read the persisted provider key from ~/.lsa/, if present."""
+    key_file = _key_file(provider)
     try:
-        if _ANTHROPIC_KEY_FILE.exists():
-            return _ANTHROPIC_KEY_FILE.read_text(encoding="utf-8").strip() or None
+        if key_file.exists():
+            return key_file.read_text(encoding="utf-8").strip() or None
     except OSError:
         return None
     return None
 
 
-def _changedocs_key_status() -> dict:
-    """Report whether an Anthropic key is configured and where it comes from."""
-    saved = _load_saved_api_key()
+def _changedocs_key_status(provider: str = "anthropic") -> dict:
+    """Report whether a provider key is configured and where it comes from."""
+    saved = _load_saved_api_key(provider)
     if saved:
         return {"configured": True, "source": "saved", "masked": _mask_api_key(saved)}
-    env_key = os.environ.get("ANTHROPIC_API_KEY")
+    env_key = os.environ.get(_KEY_ENV_VARS.get(provider, ""))
     if env_key:
         return {"configured": True, "source": "env", "masked": _mask_api_key(env_key)}
     return {"configured": False, "source": None, "masked": None}
 
 
 @app.get("/api/changedocs/key")
-async def changedocs_key_status():
-    """Report Anthropic key status (configured flag, source, masked fingerprint)."""
-    return _changedocs_key_status()
+async def changedocs_key_status(provider: str = "anthropic"):
+    """Report provider key status (configured flag, source, masked fingerprint)."""
+    _key_file(provider)
+    return _changedocs_key_status(provider)
 
 
 @app.post("/api/changedocs/key")
 async def changedocs_key_save(req: ApiKeyRequest):
-    """Persist the Anthropic key to ~/.lsa/anthropic_key with 0600 permissions."""
+    """Persist a provider key to ~/.lsa/ with 0600 permissions."""
+    key_file = _key_file(req.provider)
     key = (req.api_key or "").strip()
     if not key:
         raise HTTPException(400, "API key is empty")
-    if not key.startswith("sk-ant-"):
+    if req.provider == "anthropic" and not key.startswith("sk-ant-"):
         raise HTTPException(400, "Key does not look like an Anthropic key (expected sk-ant-…)")
     try:
-        _ANTHROPIC_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _ANTHROPIC_KEY_FILE.write_text(key, encoding="utf-8")
-        os.chmod(_ANTHROPIC_KEY_FILE, 0o600)
+        key_file.parent.mkdir(parents=True, exist_ok=True)
+        key_file.write_text(key, encoding="utf-8")
+        os.chmod(key_file, 0o600)
     except OSError as e:
         raise HTTPException(500, f"Could not save key: {e}")
-    return _changedocs_key_status()
+    return _changedocs_key_status(req.provider)
 
 
 @app.delete("/api/changedocs/key")
-async def changedocs_key_delete():
-    """Remove the persisted Anthropic key file."""
+async def changedocs_key_delete(provider: str = "anthropic"):
+    """Remove the persisted provider key file."""
     try:
-        _ANTHROPIC_KEY_FILE.unlink(missing_ok=True)
+        _key_file(provider).unlink(missing_ok=True)
     except OSError as e:
         raise HTTPException(500, f"Could not remove key: {e}")
-    return _changedocs_key_status()
+    return _changedocs_key_status(provider)
 
 
 def _changedocs_remote_overlay(cfg: dict) -> dict | None:
@@ -1480,12 +1512,51 @@ def _changedocs_remote_overlay(cfg: dict) -> dict | None:
     return overlay or None
 
 
+_CHANGEDOCS_OUTDIR_FILE = Path.home() / ".lsa" / "changedocs_outdir"
+
+
 def _changedocs_out_root(cfg: dict) -> Path:
-    """Resolve the server-side output root for generated docs."""
-    snaproot = cfg.get("snaproot")
-    if snaproot:
-        return Path(snaproot).expanduser() / "changedocs"
+    """Resolve the output root: UI-saved setting → config out_root → ~/.lsa.
+
+    Never inside snaproot — output folders must not show up as snapshots.
+    """
+    try:
+        if _CHANGEDOCS_OUTDIR_FILE.exists():
+            saved = _CHANGEDOCS_OUTDIR_FILE.read_text(encoding="utf-8").strip()
+            if saved:
+                return Path(saved).expanduser()
+    except OSError:
+        pass
+    configured = (cfg.get("changedocs") or {}).get("out_root")
+    if configured:
+        return Path(configured).expanduser()
     return Path.home() / ".lsa" / "changedocs"
+
+
+@app.get("/api/changedocs/outdir")
+async def changedocs_outdir_get():
+    """Current output folder for generated documents."""
+    from lsa.config import load_user_config
+    root = _changedocs_out_root(load_user_config())
+    return {"out_dir": str(root), "out_dir_win": _to_windows_path(str(root))}
+
+
+@app.post("/api/changedocs/outdir")
+async def changedocs_outdir_set(req: OutDirRequest):
+    """Persist the output folder (absolute path; created if missing)."""
+    raw = (req.out_dir or "").strip()
+    if not raw:
+        raise HTTPException(400, "Output folder is empty")
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        raise HTTPException(400, "Output folder must be an absolute path")
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        _CHANGEDOCS_OUTDIR_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _CHANGEDOCS_OUTDIR_FILE.write_text(str(path), encoding="utf-8")
+    except OSError as e:
+        raise HTTPException(400, f"Cannot use this folder: {e}")
+    return {"out_dir": str(path), "out_dir_win": _to_windows_path(str(path))}
 
 
 def _changedocs_ticket_id(context: dict, override: str | None) -> str:
@@ -1521,7 +1592,7 @@ async def changedocs_preview(req: ChangeDocsPreviewRequest):
         }
 
     estimate = drafter.dry_run(ctx.to_prompt(context), model=req.model, detail=req.detail,
-                               extra_context=req.extra_context)
+                               extra_context=req.extra_context, provider=req.provider)
     return {
         "parallel_id": context["parallel_id"],
         "description": context["description"],
@@ -1538,9 +1609,12 @@ async def changedocs_preview(req: ChangeDocsPreviewRequest):
 
 @app.post("/api/changedocs/generate")
 async def changedocs_generate(req: ChangeDocsGenerateRequest):
-    """Fetch context, draft CAB (always), render selected docs, return downloads."""
+    """Fetch context, draft CAB (if selected), render selected docs, return downloads."""
     from lsa.changedocs import context as ctx, draft as drafter, render as renderer
     from lsa.config import load_user_config
+
+    if not (req.cab or req.ptf or req.qa):
+        raise HTTPException(400, "Select at least one document (CAB, PTF or QA).")
 
     cfg = load_user_config()
     remote = _changedocs_remote_overlay(cfg)
@@ -1552,17 +1626,21 @@ async def changedocs_generate(req: ChangeDocsGenerateRequest):
     if not context["diffs"]:
         raise HTTPException(400, "No code diffs found in context. Nothing to generate.")
 
-    api_key = (req.api_key or "").strip() or _load_saved_api_key() or None
-    try:
-        cab_content = drafter.draft_cab(context, model=req.model, api_key=api_key,
-                                        detail=req.detail, extra_context=req.extra_context)
-    except drafter.DraftError as e:
-        raise HTTPException(400, str(e))
+    cab_content = None
+    if req.cab:
+        api_key = (req.api_key or "").strip() or _load_saved_api_key(req.provider) or None
+        base_url = (cfg.get("changedocs") or {}).get("openai_base_url")
+        try:
+            cab_content = drafter.draft_cab(context, model=req.model, api_key=api_key,
+                                            detail=req.detail, extra_context=req.extra_context,
+                                            provider=req.provider, base_url=base_url)
+        except drafter.DraftError as e:
+            raise HTTPException(400, str(e))
+        if req.ticket_id:
+            cab_content["ticket_id"] = req.ticket_id
 
-    if req.ticket_id:
-        cab_content["ticket_id"] = req.ticket_id
     ticket_id = _sanitize_component(
-        _changedocs_ticket_id(context, req.ticket_id or cab_content.get("ticket_id"))
+        _changedocs_ticket_id(context, req.ticket_id or (cab_content or {}).get("ticket_id"))
     )
 
     out_root = _changedocs_out_root(cfg)
@@ -1574,10 +1652,11 @@ async def changedocs_generate(req: ChangeDocsGenerateRequest):
     def _download_ref(name: str) -> str:
         return f"/api/changedocs/download?ticket_id={ticket_id}&name={name}"
 
-    cab_name = f"{ticket_id}_CAB_Questionnaire.docx"
-    renderer.render_cab(cab_content, str(out_dir / cab_name))
-    produced.append({"kind": "cab", "name": cab_name, "download": _download_ref(cab_name),
-                     "path": str(out_dir / cab_name)})
+    if req.cab:
+        cab_name = f"{ticket_id}_CAB_Questionnaire.docx"
+        renderer.render_cab(cab_content, str(out_dir / cab_name))
+        produced.append({"kind": "cab", "name": cab_name, "download": _download_ref(cab_name),
+                         "path": str(out_dir / cab_name)})
 
     programmer = (cfg.get("changedocs") or {}).get("programmer", "")
 
@@ -1599,6 +1678,7 @@ async def changedocs_generate(req: ChangeDocsGenerateRequest):
     return {
         "ticket_id": ticket_id,
         "out_dir": str(out_dir),
+        "out_dir_win": _to_windows_path(str(out_dir)),
         "files": produced,
         "skipped": context["skipped"],
     }

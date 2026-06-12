@@ -492,3 +492,220 @@ def test_draft_cab_accumulates_usage_across_repair_retry(monkeypatch, tmp_path):
     )
     assert content["sections"] == [{"num": 1}]
     assert _read_usage_line(log) == (250, 50)
+
+
+# --- changedocs-fixes-v2 ------------------------------------------------------
+
+def test_remote_cleanup_failure_is_non_fatal(monkeypatch):
+    """The remote command must tolerate rm failing (NFS lock files)."""
+    from types import SimpleNamespace
+
+    captured = {}
+
+    def _fake_run(cmd, **kwargs):
+        captured["remote_cmd"] = cmd[2]
+        return SimpleNamespace(returncode=0, stdout="__NOFOLDER__", stderr="")
+
+    monkeypatch.setattr(ctx.subprocess, "run", _fake_run)
+    with pytest.raises(ctx.ContextError, match="No parallel folder"):
+        ctx.fetch("20260520083853")
+    assert 'rm -rf "$F" >/dev/null 2>&1 || true' in captured["remote_cmd"]
+
+
+@pytest.mark.anyio
+async def test_generate_without_cab_renders_ptf_qa_only(monkeypatch, tmp_path):
+    _patch_generate(monkeypatch, tmp_path)
+
+    def _no_draft(*args, **kwargs):
+        raise AssertionError("draft_cab must not be called when cab=False")
+
+    monkeypatch.setattr(drafter, "draft_cab", _no_draft)
+    req = server.ChangeDocsGenerateRequest(
+        prid="20260520083853", cab=False, ptf=True, qa=True, ticket_id="SP1-77"
+    )
+    resp = await server.changedocs_generate(req)
+
+    kinds = sorted(f["kind"] for f in resp["files"])
+    assert kinds == ["ptf", "qa"]
+    assert resp["ticket_id"] == "SP1-77"
+    out_dir = tmp_path / "changedocs" / "SP1-77"
+    assert (out_dir / "SP1-77_PTF.docx").exists()
+    assert not (out_dir / "SP1-77_CAB_Questionnaire.docx").exists()
+    assert "out_dir_win" in resp
+
+
+@pytest.mark.anyio
+async def test_generate_requires_at_least_one_document(monkeypatch, tmp_path):
+    _patch_generate(monkeypatch, tmp_path)
+    from fastapi import HTTPException
+
+    req = server.ChangeDocsGenerateRequest(
+        prid="20260520083853", cab=False, ptf=False, qa=False
+    )
+    with pytest.raises(HTTPException) as exc:
+        await server.changedocs_generate(req)
+    assert exc.value.status_code == 400
+
+
+def _fake_openai_response(payload, status=200):
+    import httpx
+
+    class _Resp:
+        status_code = status
+        text = "error body"
+
+        def raise_for_status(self):
+            if status >= 400:
+                raise httpx.HTTPStatusError(
+                    "boom", request=httpx.Request("POST", "https://x"),
+                    response=httpx.Response(status, request=httpx.Request("POST", "https://x"),
+                                            text="error body"),
+                )
+
+        def json(self):
+            return payload
+
+    return _Resp()
+
+
+def test_draft_cab_openai_success_and_usage(monkeypatch, tmp_path):
+    import httpx
+
+    calls = []
+
+    def _fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return _fake_openai_response({
+            "choices": [{"message": {"content": '{"sections": [{"num": 1}]}'}}],
+            "usage": {"prompt_tokens": 120, "completion_tokens": 30},
+        })
+
+    monkeypatch.setattr(httpx, "post", _fake_post)
+    log = tmp_path / "usage.log"
+    content = drafter.draft_cab(
+        _fake_context(), provider="openai", model="gpt-4o-mini",
+        api_key="sk-test", usage_log_path=str(log),
+    )
+    assert content["sections"] == [{"num": 1}]
+    assert calls[0][0] == "https://api.openai.com/v1/chat/completions"
+    assert calls[0][1]["json"]["model"] == "gpt-4o-mini"
+    line = log.read_text()
+    assert "model=openai:gpt-4o-mini" in line
+    assert "in=120" in line and "out=30" in line
+
+
+def test_draft_cab_openai_http_error_raises_draft_error(monkeypatch, tmp_path):
+    import httpx
+
+    monkeypatch.setattr(httpx, "post", lambda url, **kw: _fake_openai_response({}, status=401))
+    with pytest.raises(drafter.DraftError, match="HTTP 401"):
+        drafter.draft_cab(_fake_context(), provider="openai", api_key="sk-bad",
+                          usage_log_path=str(tmp_path / "usage.log"))
+
+
+def test_draft_cab_openai_network_error_raises_draft_error(monkeypatch, tmp_path):
+    import httpx
+
+    def _boom(url, **kw):
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr(httpx, "post", _boom)
+    with pytest.raises(drafter.DraftError, match="API call failed"):
+        drafter.draft_cab(_fake_context(), provider="openai", api_key="sk-x",
+                          usage_log_path=str(tmp_path / "usage.log"))
+
+
+def test_dry_run_openai_unknown_model_has_no_cost_estimate():
+    est = drafter.dry_run("prompt", provider="openai", model="some-local-model")
+    assert est["model_id"] == "some-local-model"
+    assert est["estimated_cost_usd"] is None
+
+
+def test_resolve_model_defaults():
+    assert drafter._resolve_model("anthropic", "sonnet") == "claude-sonnet-4-6"
+    assert drafter._resolve_model("anthropic", "opus") == "claude-opus-4-8"
+    assert drafter._resolve_model("openai", "") == drafter.DEFAULT_OPENAI_MODEL
+    assert drafter._resolve_model("openai", "sonnet") == drafter.DEFAULT_OPENAI_MODEL
+    assert drafter._resolve_model("openai", "gpt-4o") == "gpt-4o"
+
+
+@pytest.mark.anyio
+async def test_openai_key_endpoints_separate_from_anthropic(monkeypatch, tmp_path):
+    monkeypatch.setattr(server, "_ANTHROPIC_KEY_FILE", tmp_path / "anthropic_key")
+    monkeypatch.setattr(server, "_OPENAI_KEY_FILE", tmp_path / "openai_key")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    saved = await server.changedocs_key_save(
+        server.ApiKeyRequest(api_key="sk-or-v1-" + "B" * 30, provider="openai")
+    )
+    assert saved["configured"] is True
+    assert (tmp_path / "openai_key").exists()
+    assert not (tmp_path / "anthropic_key").exists()
+
+    anth = await server.changedocs_key_status(provider="anthropic")
+    assert anth["configured"] is False
+
+    removed = await server.changedocs_key_delete(provider="openai")
+    assert removed["configured"] is False
+    assert not (tmp_path / "openai_key").exists()
+
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException):
+        await server.changedocs_key_status(provider="bogus")
+
+
+def test_out_root_resolution_order(monkeypatch, tmp_path):
+    setting = tmp_path / "changedocs_outdir"
+    monkeypatch.setattr(server, "_CHANGEDOCS_OUTDIR_FILE", setting)
+
+    # Default: ~/.lsa/changedocs (never under snaproot)
+    root = server._changedocs_out_root({"snaproot": str(tmp_path / "snaps")})
+    assert root == server.Path.home() / ".lsa" / "changedocs"
+
+    # Config out_root wins over default
+    root = server._changedocs_out_root({"changedocs": {"out_root": str(tmp_path / "cfg")}})
+    assert root == tmp_path / "cfg"
+
+    # Saved UI setting wins over config
+    setting.write_text(str(tmp_path / "saved"))
+    root = server._changedocs_out_root({"changedocs": {"out_root": str(tmp_path / "cfg")}})
+    assert root == tmp_path / "saved"
+
+
+@pytest.mark.anyio
+async def test_outdir_endpoints_save_and_validate(monkeypatch, tmp_path):
+    setting = tmp_path / "changedocs_outdir"
+    monkeypatch.setattr(server, "_CHANGEDOCS_OUTDIR_FILE", setting)
+    monkeypatch.setattr("lsa.config.load_user_config", lambda: {})
+
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as rel:
+        await server.changedocs_outdir_set(server.OutDirRequest(out_dir="relative/path"))
+    assert rel.value.status_code == 400
+
+    target = tmp_path / "win_docs"
+    resp = await server.changedocs_outdir_set(server.OutDirRequest(out_dir=str(target)))
+    assert resp["out_dir"] == str(target)
+    assert target.is_dir()
+    assert setting.read_text() == str(target)
+
+    current = await server.changedocs_outdir_get()
+    assert current["out_dir"] == str(target)
+
+
+@pytest.mark.anyio
+async def test_snapshots_listing_skips_non_snapshot_dirs(monkeypatch, tmp_path):
+    snap = tmp_path / "rhs_snapshot_a"
+    (snap / "procs").mkdir(parents=True)
+    stray = tmp_path / "changedocs"
+    stray.mkdir()
+    (stray / "SP1-1_PTF.docx").write_bytes(b"PK")
+
+    monkeypatch.setattr(server, "_snaproot", tmp_path)
+    monkeypatch.setattr(server, "_snapshot_path", None)
+
+    listed = await server.list_snapshots()
+    names = [s["name"] for s in listed]
+    assert "rhs_snapshot_a" in names
+    assert "changedocs" not in names

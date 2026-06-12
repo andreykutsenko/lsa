@@ -1,0 +1,36 @@
+{
+  "task_id": "changedocs-fixes-v2",
+  "verified_at": "2026-06-12",
+  "verifier": "task-verifier (independent rerun against working tree)",
+  "overall": "PASS",
+  "criteria": [
+    {
+      "id": "AC1",
+      "status": "PASS",
+      "evidence": "lsa/changedocs/context.py:143 — the remote command string passed to ssh ends with 'rm -rf \"$F\" >/dev/null 2>&1 || true' (inside the .format() template, so it executes remotely). The '__NOFOLDER__' early exit ('[ -n \"$F\" ] || { echo \"__NOFOLDER__\"; exit 0; }') is unchanged and still raises ContextError. Test test_remote_cleanup_failure_is_non_fatal captures cmd[2] (the actual remote string) and asserts the tolerant form; it passes."
+    },
+    {
+      "id": "AC2",
+      "status": "PASS",
+      "evidence": "ChangeDocsGenerateRequest.cab: bool = True (server.py:166). cab=False skips both draft_cab and the _load_saved_api_key lookup (both are inside 'if req.cab:' at server.py:1630-1640); ticket_id resolves via req.ticket_id or (cab_content or {}).get('ticket_id') — for cab=True this is behavior-equivalent to the previous code (override applied to cab_content, same cab/ptf/qa render order). Zero-docs 400 (server.py:1616) fires before ctx.fetch, so no ssh round-trip. UI: cd-cab checkbox enabled and default-checked (state.changeDocs.cab=true), changeDocsGenerate shows cd-docs-error and returns without a request when nothing is selected. Tests test_generate_without_cab_renders_ptf_qa_only (draft_cab patched to AssertionError) and test_generate_requires_at_least_one_document pass."
+    },
+    {
+      "id": "AC3",
+      "status": "PASS",
+      "evidence": "draft.py: _resolve_model handles both providers; openai path posts to (base_url or DEFAULT_OPENAI_BASE_URL)/chat/completions via httpx; httpx.HTTPStatusError and httpx.HTTPError (covers ConnectError and TimeoutException) both become DraftError; at most one JSON-repair retry; usage logged in a finally block, so it is written even when the second parse fails; anthropic SDK path unchanged (guardrail source test still asserts cache_control/ephemeral/two _call sites and passes); opus pricing now 5/25, unknown model -> estimated_cost_usd None (UI renders em dash). Key endpoints route through _key_file which returns only the fixed ~/.lsa/anthropic_key / ~/.lsa/openai_key paths and raises HTTP 400 for any other provider; sk-ant- check anthropic-only. UI sends _changeDocsModel(cd) (openaiModel free text for openai, sonnet/opus select for anthropic) in both preview and generate; key block is provider-aware. httpx>=0.27.0 declared in [web] extras and dev group; uv.lock delta is minimal. Tests: openai success+usage log, HTTP 401 -> DraftError, ConnectError -> DraftError, _resolve_model defaults, dry_run None cost, per-provider key endpoints incl. bogus provider 400 — all pass."
+    },
+    {
+      "id": "AC4",
+      "status": "PASS",
+      "evidence": "_changedocs_out_root (server.py:1518): saved ~/.lsa/changedocs_outdir -> changedocs.out_root config -> ~/.lsa/changedocs; the old snaproot/changedocs default is gone (grep confirms no snaproot coupling remains). GET/POST /api/changedocs/outdir implemented; POST rejects empty and relative paths with 400, mkdirs and persists. /api/snapshots filters via _looks_like_snapshot (LSA db or procs/master/control/insert/docdef); create_snapshot mkdirs master/procs/control/insert/docdef before rsync (server.py:425-426), so a UI-created snapshot is listed immediately; the active _snapshot_path is appended before the filter, so a marker-less selected snapshot stays visible. UI: editable Output folder with Save + Windows-path hint; generate result shows out_dir_win with click-to-copy; per-ticket subfolder (out_root / ticket_id) kept. Tests test_out_root_resolution_order, test_outdir_endpoints_save_and_validate, test_snapshots_listing_skips_non_snapshot_dirs pass."
+    },
+    {
+      "id": "AC5",
+      "status": "PASS",
+      "evidence": "Independent rerun on 2026-06-12: 'uv run pytest -q' -> 212 passed in 1.40s; 'node --check lsa/web/static/app.js' -> exit 0. All 12 new tests listed in the spec are present in tests/test_changedocs.py."
+    }
+  ],
+  "scope_check": "git diff touches only context.py, draft.py, server.py, app.js, pyproject.toml, uv.lock, tests/test_changedocs.py; all app.js hunks are within the changedocs section plus the state initializer; uv.lock delta is httpx-only. Within spec.",
+  "policy_check": "Diff grep for internal hostnames, client names, IPs, and personal paths found nothing; placeholder values (rhs alias, /path/to/..., SP1-NNNN ticket ids) follow existing public-repo conventions.",
+  "notes": "Anthropic usage.log line format changed from 'model=<id>' to 'model=anthropic:<id>' — intentional per the spec's provider/model tag requirement. Old docs under snaproot/changedocs are not migrated, as documented in evidence.md."
+}
