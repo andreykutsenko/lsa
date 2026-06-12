@@ -1,6 +1,7 @@
 """CLI entry point for LSA."""
 
 import json
+import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,7 @@ from .config import (
     HISTORIES_DIR,
     MAX_TEXT_SIZE,
     get_db_path,
+    load_user_config,
 )
 from .db import (
     init_db,
@@ -167,6 +169,7 @@ def scan(
                             size=stat.st_size,
                             sha256=sha256,
                             text_content=text_content,
+                            commit=False,
                         )
 
                         # Parse .procs files
@@ -180,6 +183,7 @@ def scan(
                                 path=relative_path,
                                 parsed_json=procs_data.to_json(),
                                 sha256=sha256,
+                                commit=False,
                             )
                             procs_list.append((proc_name, procs_data))
                             stats["procs_parsed"] += 1
@@ -190,6 +194,8 @@ def scan(
                             console.print(f"[red]Error processing {file_path}:[/red] {e}")
 
                 progress.remove_task(task)
+
+            conn.commit()
 
             # Build graph from parsed procs
             if procs_list:
@@ -378,7 +384,8 @@ def _search_fts(conn, query: str, limit: int) -> list:
             """,
             (query, limit),
         ).fetchall()
-    except Exception:
+    except sqlite3.OperationalError as e:
+        console.print(f"[yellow]Warning:[/yellow] FTS query {query!r} failed: {e}")
         return []
 
 
@@ -639,11 +646,16 @@ def import_histories(
     console.print(f"  Total case cards in database: {total_in_db}")
 
 
-# Default PDF paths for auto-detection
-DEFAULT_PDF_PATHS = [
-    # Global reference location
-    Path("$SNAPROOT/refs/papyrus/Papyrus_DocExec_message_codes.pdf"),
-]
+# Default PDF paths for auto-detection (extended via 'codes_pdf' in ~/.lsa/config.yaml)
+DEFAULT_PDF_PATHS: list[Path] = []
+
+
+def _configured_pdf_path() -> Path | None:
+    """Read optional 'codes_pdf' path from ~/.lsa/config.yaml."""
+    codes_pdf = load_user_config().get("codes_pdf")
+    if not codes_pdf:
+        return None
+    return Path(codes_pdf).expanduser()
 
 
 def _find_pdf_path(snapshot: Path, pdf_option: Path | None) -> Path | None:
@@ -653,7 +665,8 @@ def _find_pdf_path(snapshot: Path, pdf_option: Path | None) -> Path | None:
     Order:
     1. Explicit --pdf option
     2. <snapshot>/refs/papyrus/*.pdf
-    3. Global default paths
+    3. 'codes_pdf' from ~/.lsa/config.yaml
+    4. Global default paths
     """
     if pdf_option:
         return pdf_option if pdf_option.exists() else None
@@ -664,6 +677,11 @@ def _find_pdf_path(snapshot: Path, pdf_option: Path | None) -> Path | None:
         pdfs = list(snapshot_refs.glob("*.pdf"))
         if pdfs:
             return pdfs[0]
+
+    # Try user-configured path
+    configured = _configured_pdf_path()
+    if configured and configured.exists():
+        return configured
 
     # Try default global paths
     for path in DEFAULT_PDF_PATHS:
@@ -688,7 +706,7 @@ def import_codes(
     Parses the PDF file and populates the message_codes table in the
     snapshot database. If --pdf is omitted, auto-detects PDF from:
       1. <snapshot>/refs/papyrus/*.pdf
-      2. /mnt/c/.../rhs_snapshot_project/refs/papyrus/Papyrus_DocExec_message_codes.pdf
+      2. 'codes_pdf' path in ~/.lsa/config.yaml
     """
     from .parsers.pdf_parser import parse_pdf_file_safe
 
@@ -705,9 +723,14 @@ def import_codes(
         if pdf:
             console.print(f"  --pdf: {pdf}")
         console.print(f"  <snapshot>/refs/papyrus/*.pdf")
+        configured = _configured_pdf_path()
+        if configured:
+            console.print(f"  codes_pdf (~/.lsa/config.yaml): {configured}")
         for p in DEFAULT_PDF_PATHS:
             console.print(f"  {p}")
-        console.print("\nUse --pdf to specify the path explicitly.")
+        console.print(
+            "\nUse --pdf or set 'codes_pdf' in ~/.lsa/config.yaml to specify the path."
+        )
         raise typer.Exit(1)
 
     db_path = get_db_path(snapshot)
@@ -759,6 +782,7 @@ def import_codes(
                         body=entry.body,
                         source_path=source_path_str,
                         created_at=now,
+                        commit=False,
                     )
                     stored += 1
                 except Exception as e:
@@ -767,6 +791,7 @@ def import_codes(
 
             progress.remove_task(task)
 
+        conn.commit()
         total_in_db = count_message_codes(conn)
 
     console.print()

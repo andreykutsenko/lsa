@@ -26,6 +26,10 @@ def get_connection(db_path: Path) -> Generator[sqlite3.Connection, None, None]:
     conn.execute("PRAGMA journal_mode = WAL")
     try:
         yield conn
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -39,6 +43,7 @@ def insert_artifact(
     sha256: str | None = None,
     text_content: str | None = None,
     original_path: str | None = None,
+    commit: bool = True,
 ) -> int:
     """Insert an artifact and return its ID."""
     cursor = conn.execute(
@@ -48,7 +53,8 @@ def insert_artifact(
         """,
         (kind, path, original_path, sha256, mtime, size, text_content),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return cursor.lastrowid
 
 
@@ -58,6 +64,7 @@ def insert_proc(
     path: str,
     parsed_json: str,
     sha256: str | None = None,
+    commit: bool = True,
 ) -> int:
     """Insert a parsed proc and return its ID."""
     cursor = conn.execute(
@@ -67,7 +74,8 @@ def insert_proc(
         """,
         (proc_name, path, parsed_json, sha256),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return cursor.lastrowid
 
 
@@ -79,6 +87,7 @@ def insert_node(
     canonical_path: str | None = None,
     original_path: str | None = None,
     confidence: float = 1.0,
+    commit: bool = True,
 ) -> int:
     """Insert or get existing node, return its ID."""
     # Try to get existing
@@ -95,7 +104,8 @@ def insert_node(
         """,
         (node_type, key, display_name, canonical_path, original_path, confidence),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return cursor.lastrowid
 
 
@@ -106,6 +116,7 @@ def insert_edge(
     rel_type: str,
     confidence: float = 1.0,
     evidence_json: str | None = None,
+    commit: bool = True,
 ) -> int:
     """Insert an edge and return its ID."""
     # Check if edge already exists
@@ -123,7 +134,8 @@ def insert_edge(
         """,
         (src, dst, rel_type, confidence, evidence_json),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return cursor.lastrowid
 
 
@@ -340,6 +352,7 @@ def insert_message_code(
     body: str,
     source_path: str,
     created_at: str,
+    commit: bool = True,
 ) -> None:
     """Insert or replace a message code entry."""
     conn.execute(
@@ -349,7 +362,8 @@ def insert_message_code(
         """,
         (code, severity, title, body, source_path, created_at),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def get_message_code(conn: sqlite3.Connection, code: str) -> dict | None:

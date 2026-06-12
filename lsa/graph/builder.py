@@ -43,6 +43,7 @@ def build_graph_from_procs(
             canonical_path=f"procs/{proc_name}.procs",
             original_path=None,
             confidence=1.0,
+            commit=False,
         )
         stats["nodes_created"] += 1
 
@@ -67,6 +68,7 @@ def build_graph_from_procs(
                     rel_type="RUNS",
                     confidence=1.0,
                     evidence_json=json.dumps(evidence),
+                    commit=False,
                 )
                 stats["edges_created"] += 1
 
@@ -92,6 +94,7 @@ def _create_script_node(
         canonical_path=canonical_str,
         original_path=script_path,
         confidence=confidence,
+        commit=False,
     )
 
 
