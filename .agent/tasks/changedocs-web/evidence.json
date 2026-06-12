@@ -1,0 +1,74 @@
+{
+  "task_id": "changedocs-web",
+  "date": "2026-06-08",
+  "interpreter": "uv run (.venv Python 3.14)",
+  "overall_status": "PASS",
+  "notes": "Live ssh rhs and live Claude API are not runnable in this environment and are covered by mocks per spec section 8.7, not live calls.",
+  "acceptance_criteria": {
+    "AC1": {
+      "status": "PASS",
+      "command": "uv run python -c \"import lsa.changedocs; import lsa.changedocs.context as c; import lsa.changedocs.draft as d; import lsa.changedocs.render as r; from lsa.changedocs.generate_cab import build_cab; print('import ok')\"",
+      "notes": "import ok; draft.py uses 'from .context import to_prompt', render.py uses 'from .generate_cab import build_cab'; no sys.path manipulation in package."
+    },
+    "AC2": {
+      "status": "PASS",
+      "command": "uv run python -c \"import pathlib; print('assets', all(p.exists() and p.stat().st_size>0 for p in [...]))\"",
+      "notes": "assets True; system_cab.md + ptf/qa templates present and non-empty; loaded by AC5/AC7 tests."
+    },
+    "AC3": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "notes": "test_collect_diffs_whitelist_and_caps + test_ported_constants_unchanged: whitelist, per-file truncation, empty/non-code skip, total cap; constants 200000/60000 and CODE_EXTENSIONS preserved."
+    },
+    "AC4": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "notes": "test_parse_header_extracts_fields: Description, Parallel ID, numbered Files list."
+    },
+    "AC5": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "notes": "test_dry_run_returns_estimate_no_api + test_preview_route_no_api_no_usage_log: draft_cab never invoked on preview, no usage.log written, response has model_id/estimated_input_tokens/max_output_tokens/estimated_cost_usd."
+    },
+    "AC6": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "notes": "test_generate_cab_only and test_generate_cab_ptf_qa with fetch/draft_cab mocked: exactly requested .docx written, CAB always, one download ref per file."
+    },
+    "AC7": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "notes": "test_render_ptf_fills_fields (JIRA/hours/parallel_id/file-count) and test_render_qa_clones_l_rows (L1..Ln cloned+filled); no API."
+    },
+    "AC8": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "notes": "test_download_streams_and_rejects_traversal: correct content type, re-download works, 404 missing, 403/404 on ../../ traversal."
+    },
+    "AC9": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "notes": "test_draft_guardrails_present_in_source: ANTHROPIC_API_KEY only, no tools, cache_control/ephemeral, max_tokens=MAX_OUTPUT_TOKENS, two 'resp = _call(' sites (one call + one repair retry), _log_usage called. test_fetch_rejects_short_prid: short PRID raises ContextError; routes map to 400."
+    },
+    "AC10": {
+      "status": "PASS",
+      "command": "uv run python -c \"import docx, anthropic; print('deps ok')\"",
+      "notes": "deps ok (docx 1.2.0, anthropic 0.106.0). pyproject web extra = fastapi, uvicorn, python-docx, anthropic."
+    },
+    "AC11": {
+      "status": "PASS",
+      "command": "uv run pytest tests/test_web_server.py -q",
+      "notes": "10 passed; /api/changedocs/{preview,generate,download} registered on server.app."
+    },
+    "AC12": {
+      "status": "PASS",
+      "command": "node --check lsa/web/static/app.js",
+      "notes": "exit 0; index.html data-step=changedocs nav + app.js case 'changedocs' renderChangeDocsStep with PRID/model/preview/PTF+QA checkboxes/PTF fields/download links; test_app_js_parses_when_node_is_available passes."
+    },
+    "AC13": {
+      "status": "PASS",
+      "command": "uv run pytest -q",
+      "notes": "170 passed, no failures."
+    }
+  }
+}

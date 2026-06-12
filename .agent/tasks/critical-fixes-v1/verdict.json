@@ -1,0 +1,60 @@
+{
+  "task_id": "critical-fixes-v1",
+  "verified_at": "2026-06-11",
+  "verifier": "task-verifier (independent rerun)",
+  "overall": "PASS",
+  "criteria": {
+    "AC1": {
+      "status": "PASS",
+      "verified_by": [
+        "Code read: lsa/web/server.py:273 (delete_snapshot: snap == snaproot or not snap.is_relative_to(snaproot) -> 403), :577 (read_file: file_path.is_relative_to(snapshot.resolve())), :1577 (changedocs_download: file_path.is_relative_to(out_root)); all operate on .resolve()'d paths, so sibling-prefix and symlink escapes are rejected",
+        "Only remaining startswith in server.py is key.startswith('sk-ant-') at :1407 (unrelated to paths)",
+        "Tests rerun and passing: test_read_file_rejects_sibling_prefix_dir, test_delete_snapshot_rejects_snaproot_and_siblings (rejects snaproot itself AND <root>-evil sibling, then deletes a real child), test_download_rejects_sibling_prefix_dir"
+      ]
+    },
+    "AC2": {
+      "status": "PASS",
+      "verified_by": [
+        "Helper _sanitize_component at lsa/web/server.py:50: charset [A-Za-z0-9._-], unsafe runs -> '_', leading dots stripped, empty/dot-underscore-only raises HTTP 400; verified '..', '.', '___', '.._..', '' all raise 400 and 'a/b' -> 'a_b' (separators neutralized)",
+        "create_snapshot (server.py:321): explicit 400 when _sanitize_component(req.name) != req.name (no silent rename)",
+        "workspace create (server.py:954,956): req.ticket / req.title sanitized into ws_name",
+        "changedocs_generate (server.py:1529): resolved ticket_id sanitized before use in out_dir and filenames; test asserts no '/' or '\\\\' in result and out_dir is_relative_to(out_root)"
+      ]
+    },
+    "AC3": {
+      "status": "PASS",
+      "verified_by": [
+        "pyproject.toml [tool.hatch.build].include contains lsa/changedocs/prompts/*.md and lsa/changedocs/templates/*.docx",
+        "Fresh build: uv build --wheel -o /tmp/lsa-verify-wheel succeeded; wheel contains lsa/changedocs/prompts/system_cab.md, lsa/changedocs/templates/ptf_template.docx, lsa/changedocs/templates/qa_template.docx"
+      ]
+    },
+    "AC4": {
+      "status": "PASS",
+      "verified_by": [
+        "grep -rn <username> lsa/ --include=*.py -> no matches",
+        "lsa/cli.py:644 DEFAULT_PDF_PATHS: list[Path] = [] (constant kept, empty)",
+        "_configured_pdf_path (cli.py:647) reads codes_pdf via load_user_config with expanduser; _find_pdf_path consults it between snapshot-local lookup and DEFAULT_PDF_PATHS (cli.py:676-683)",
+        "import-codes docstring (cli.py:702-703) and not-found error output (cli.py:716-727) reflect new lookup order",
+        "tests/test_import_codes.py unmodified (not in git status) and passes: 12 passed"
+      ]
+    },
+    "AC5": {
+      "status": "PASS",
+      "verified_by": [
+        "Independent rerun: uv run pytest -q -> 185 passed, 0 failed",
+        "New tests present and passing: 3x test_sanitize_component_*, test_read_file_rejects_sibling_prefix_dir, test_delete_snapshot_rejects_snaproot_and_siblings, test_create_snapshot_rejects_unsafe_name (tests/test_web_server.py:232-305); test_download_rejects_sibling_prefix_dir, test_generate_sanitizes_ticket_id (tests/test_changedocs.py:381-411)",
+        "tests/test_import_codes.py passes unmodified"
+      ]
+    }
+  },
+  "scope_check": {
+    "lsa/cli.py": "Diff is exactly the AC4 change (load_user_config import, DEFAULT_PDF_PATHS emptied, _configured_pdf_path, lookup order, docstring/error text). No unrelated behavior changes.",
+    "lsa/web/server.py": "Task-relevant hunks confined to spec (sanitizer helper, 3 containment fixes, sanitizer call sites). The remaining diff vs HEAD is the pre-existing uncommitted changedocs feature from an earlier task, not introduced by critical-fixes-v1.",
+    "pyproject.toml": "AC3 include lines added; python-docx/anthropic dependency additions belong to the pre-existing changedocs feature, not this task."
+  },
+  "commands_rerun": [
+    "uv run pytest -q (185 passed)",
+    "uv run pytest -q tests/test_import_codes.py (12 passed)",
+    "uv build --wheel -o /tmp/lsa-verify-wheel && unzip -l (3 changedocs data files present)"
+  ]
+}

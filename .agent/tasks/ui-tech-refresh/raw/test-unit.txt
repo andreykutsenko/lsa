@@ -1,0 +1,6 @@
+Command: `./.venv/bin/pytest -q`
+Exit code: 0
+
+Output summary:
+- 147 tests passed
+- runtime: 0.28s

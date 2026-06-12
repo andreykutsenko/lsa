@@ -1,0 +1,120 @@
+{
+  "task_id": "ui-console-v1-implementation",
+  "overall_status": "PASS",
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "text": "Overview is refactored from index-metrics view into an operator summary led by Current scope, Entry points, Signals and incidents, Snapshot contents, and secondary Diagnostics.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/app.js: Overview rewritten around Current scope and operator summary sections.",
+        "lsa/web/server.py: /api/stats returns normalized contents and recent incidents."
+      ],
+      "gaps": [
+        "No screenshot captured."
+      ]
+    },
+    {
+      "id": "AC2",
+      "text": "Current scope shows the active snapshot, selected candidate or proc context when available, concise scope composition by kinds, and the actions Open files, Create workspace, Copy file list, Generate prompt, and Open diagram.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/app.js: reusable Current scope block with required actions.",
+        "Existing workspace and diagram APIs are reused from the scope actions."
+      ],
+      "gaps": [
+        "Open files routes to the scope builder file explorer instead of a dedicated separate file manager."
+      ]
+    },
+    {
+      "id": "AC3",
+      "text": "Search supports Path vs Content mode, Current scope vs Whole snapshot scope, kind filters for All, procs, scripts, controls, inserts, docdef, logs, and refs, and exposes useful result actions without a heavy explanatory aside.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/app.js: Search UI exposes mode, scope, kind, preview/copy/open-in-scope actions.",
+        "lsa/web/server.py: search endpoint and helpers support mode/scope/kind filtering with match_type.",
+        "tests/test_web_server.py: search helper coverage."
+      ],
+      "gaps": [
+        "No per-hit add-to-workspace action in V1."
+      ]
+    },
+    {
+      "id": "AC4",
+      "text": "Snapshots page becomes a more operational list or table that surfaces snapshot, captured time, ready state, freshness, contents summary, incidents, and actions, while de-emphasizing delete and large explanatory cards.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/app.js: operational snapshot table.",
+        "lsa/web/static/style.css: operational table styling and de-emphasized delete button."
+      ],
+      "gaps": [
+        "Freshness uses relative mtime."
+      ]
+    },
+    {
+      "id": "AC5",
+      "text": "Prompt UI works from the current scope, presents two user-facing scenarios (incident analysis and change request analysis), supports Generate prompt, Copy prompt, Save prompt, and Include diagram, while preserving existing prompt generation functionality behind the UI.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/app.js: Prompt UI tied to current scope with scenario switch and save/copy/include-diagram controls.",
+        "lsa/web/server.py: scenario-based prompt generation and save support while preserving legacy prompt modes."
+      ],
+      "gaps": [
+        "Legacy modes remain backend-only in V1."
+      ]
+    },
+    {
+      "id": "AC6",
+      "text": "Snapshot creation flow keeps a short default form and adds optional enrichments behind an Advanced sources accordion or similar progressive disclosure for control or prox or insert or related files, Papyrus PDF, incidents folder, and research or logs folder.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/app.js: Advanced sources accordion with optional inputs and enabled-count summary.",
+        "lsa/web/server.py: optional source paths for PDF, incidents/histories, research, related files, and prox."
+      ],
+      "gaps": [
+        "Remote control/insert/docdef remain part of the base snapshot rather than optional toggles."
+      ]
+    },
+    {
+      "id": "AC7",
+      "text": "The implementation preserves existing core functionality where feasible and avoids decorative dashboard elements, wide backend rewrites, separate dark-mode work, and V2-only features.",
+      "status": "PASS",
+      "proof": [
+        "Primary change surface stayed in app.js, style.css, index.html, server.py.",
+        "No dark mode, incidents page, smart recommendations, or global shell redesign were added."
+      ],
+      "gaps": []
+    },
+    {
+      "id": "AC8",
+      "text": "The task is completed with repo-local proof artifacts, relevant checks, and a Russian summary for the user.",
+      "status": "PASS",
+      "proof": [
+        "Repo-local artifacts updated under .agent/tasks/ui-console-v1-implementation/.",
+        "Checks stored in raw artifacts and summarized in evidence.md."
+      ],
+      "gaps": [
+        "Fresh verifier not run; verdict.json remains UNKNOWN."
+      ]
+    }
+  ],
+  "changed_files": [
+    "lsa/web/server.py",
+    "lsa/web/static/app.js",
+    "lsa/web/static/index.html",
+    "lsa/web/static/style.css",
+    "tests/test_web_server.py",
+    ".agent/tasks/ui-console-v1-implementation/spec.md",
+    ".agent/tasks/ui-console-v1-implementation/evidence.md",
+    ".agent/tasks/ui-console-v1-implementation/evidence.json"
+  ],
+  "commands_for_fresh_verifier": [
+    "python3 -m py_compile lsa/web/server.py",
+    "node --check lsa/web/static/app.js",
+    "pytest -q tests/test_web_server.py tests/test_planner.py tests/test_deep_prompt.py"
+  ],
+  "known_gaps": [
+    "No screenshot artifact was produced.",
+    "No fresh-session verifier updated verdict.json."
+  ]
+}

@@ -1,0 +1,6 @@
+No standalone lint command is configured in `pyproject.toml`.
+
+Closest local checks run for this task:
+- `node --check lsa/web/static/app.js`
+- `./.venv/bin/pytest -q`
+- `./.venv/bin/python - <<'PY' ...` importing `lsa.web.server`

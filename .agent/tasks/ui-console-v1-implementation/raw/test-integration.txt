@@ -1,0 +1,1 @@
+Not run: no separate integration suite for the web UI refactor.

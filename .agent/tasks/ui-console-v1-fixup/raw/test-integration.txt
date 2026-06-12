@@ -1,0 +1,209 @@
+Live UI/API smoke test executed outside sandbox against restarted LSA server on 127.0.0.1:18903
+
+1. Headless Chrome render of /
+[71123:71123:0325/121008.269765:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LSA Web UI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="topbar-brand">
+        <div class="topbar-mark">
+          <span class="topbar-logo">LSA</span>
+          <span class="topbar-build">Operator Workbench</span>
+        </div>
+        <div class="topbar-titleblock">
+          <span class="topbar-subtitle">Legacy Script Archaeologist</span>
+          <span class="topbar-context">snapshot-first analysis console</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-status">
+          <span class="topbar-chip">fastapi</span>
+          <span class="topbar-chip">static-spa</span>
+          <span class="topbar-chip">indexed mode</span>
+        </div>
+        <span class="topbar-snap" id="current-snap">No snapshot selected</span>
+      </div>
+    </header>
+
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Workbench</div>
+        <div class="sidebar-subtitle">Acquisition, triage, and prompt assembly</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Pipeline</div>
+        <div class="step active" data-step="snapshot">Snapshot</div>
+        <div class="step" data-step="bundle">Bundle</div>
+        <div class="step" data-step="prompt">Prompt</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Inspect</div>
+        <div class="step" data-step="stats">Overview</div>
+        <div class="step" data-step="search">Search</div>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-label">Active snapshot</div>
+        <div class="sidebar-footer-value" id="current-snap-sidebar">none</div>
+        <div class="sidebar-footer-meta">Select a scope to unlock prompt and scope-aware search.</div>
+      </div>
+    </nav>
+
+    <main class="content" id="content">
+    
+    <div class="page-head">
+      <div class="page-head-main">
+        <div class="page-kicker">Operator Console</div>
+        <h2 class="page-title">Snapshots</h2>
+        <p class="page-subtitle">Operational snapshot inventory and snapshot creation flow.</p>
+      </div>
+      <div class="page-head-side"><div class="page-meta">no active snapshot</div></div>
+    </div>
+    <div class="toolbar toolbar--tight">
+      <button class="btn btn--primary" id="btn-new-snap">New snapshot</button>
+      <button class="btn" id="btn-refresh-snaps">Refresh</button>
+    </div>
+    <div class="help-line">Base snapshot copies production scripts, procs, control, insert and docdef. Optional sources stay hidden until needed.</div>
+    <div id="new-snap-form" hidden=""></div>
+    <div id="snap-list" class="section">
+    <div class="ops-table">
+      <div class="ops-table__head ops-table__head--snapshots">
+        <span>Snapshot</span>
+        <span>Captured</span>
+        <span>Ready</span>
+        <span>Freshness</span>
+        <span>Contents summary</span>
+        <span>Incidents</span>
+        <span>Actions</span>
+      </div>
+      
+          <div class="ops-table__row ops-table__row--snapshots" data-snap-row="0">
+            <div class="ops-cell ops-cell--primary">
+              <div class="ops-title">rhs_snapshot_snapshot_20260325</div>
+              <div class="ops-sub">/home/kts/snapshots/rhs_snapshot_snapshot_20260325</div>
+            </div>
+            <div class="ops-cell">2026-03-25 09:36</div>
+            <div class="ops-cell"><span class="status-dot is-ready"></span>Ready</div>
+            <div class="ops-cell">3h ago</div>
+            <div class="ops-cell">
+    <div class="snap-summary">
+      <span>1558 procs</span>
+      <span>4093 scripts</span>
+      <span>9146 controls</span>
+      <span>7039 docdef</span>
+    </div></div>
+            <div class="ops-cell">0</div>
+            <div class="ops-cell ops-cell--actions">
+              <button class="btn btn--sm" data-action="select-snap" data-idx="0">Use</button>
+              <button class="btn btn--sm btn--danger btn--danger-subtle" data-action="delete-snap" data-idx="0">Delete</button>
+            </div>
+          </div>
+          <div class="ops-table__row ops-table__row--snapshots" data-snap-row="1">
+            <div class="ops-cell ops-cell--primary">
+              <div class="ops-title">rhs_snapshot_20260225_114334</div>
+              <div class="ops-sub">/home/kts/snapshots/rhs_snapshot_20260225_114334</div>
+            </div>
+            <div class="ops-cell">2026-03-23 15:12</div>
+            <div class="ops-cell"><span class="status-dot is-ready"></span>Ready</div>
+            <div class="ops-cell">2d ago</div>
+            <div class="ops-cell">
+    <div class="snap-summary">
+      <span>1555 procs</span>
+      <span>4084 scripts</span>
+      <span>9123 controls</span>
+      <span>7029 docdef</span>
+    </div></div>
+            <div class="ops-cell">0</div>
+            <div class="ops-cell ops-cell--actions">
+              <button class="btn btn--sm" data-action="select-snap" data-idx="1">Use</button>
+              <button class="btn btn--sm btn--danger btn--danger-subtle" data-action="delete-snap" data-idx="1">Delete</button>
+            </div>
+          </div>
+          <div class="ops-table__row ops-table__row--snapshots" data-snap-row="2">
+            <div class="ops-cell ops-cell--primary">
+              <div class="ops-title">rhs_snapshot_snapshot_20260324</div>
+              <div class="ops-sub">/home/kts/snapshots/rhs_snapshot_snapshot_20260324</div>
+            </div>
+            <div class="ops-cell">2026-03-24 20:11</div>
+            <div class="ops-cell"><span class="status-dot is-ready"></span>Ready</div>
+            <div class="ops-cell">16h ago</div>
+            <div class="ops-cell">
+    <div class="snap-summary">
+      <span>1558 procs</span>
+      <span>4093 scripts</span>
+      <span>9145 controls</span>
+      <span>7038 docdef</span>
+    </div></div>
+            <div class="ops-cell">0</div>
+            <div class="ops-cell ops-cell--actions">
+              <button class="btn btn--sm" data-action="select-snap" data-idx="2">Use</button>
+              <button class="btn btn--sm btn--danger btn--danger-subtle" data-action="delete-snap" data-idx="2">Delete</button>
+            </div>
+          </div>
+    </div></div>
+  </main>
+  </div>
+
+  <div class="modal" id="modal" hidden="">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title"></span>
+        <button class="modal-close" id="modal-close">×</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden=""></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script src="/static/app.js"></script>
+
+
+</body></html>
+
+
+2. Select snapshot
+{"status":"ok","snapshot":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325"}
+
+3. Build scope
+{"snapshot_root":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325","intent":{"cid":"wccu","job_id":null,"letter_number":null,"keywords":["wccu"],"raw_title":"WCCU"},"selected_bundle":{"rank":1,"key":"proc:wccuea1","display_name":"WCCU - Escrow Analysis","score":52,"files":[{"kind":"procs","path":"procs/wccuea1.procs","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/procs/wccuea1.procs","reason":"proc_file"},{"kind":"script","path":"master/wccu_ea_process.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccu_ea_process.sh","reason":"RUNS_edge"},{"kind":"insert","path":"insert/wccuea1.ins","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/insert/wccuea1.ins","reason":"procs_file_setup"},{"kind":"control","path":"control/wccuea1.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1.control","reason":"control_match"},{"kind":"control","path":"control/wccuea1_template.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1_template.control","reason":"control_match"},{"kind":"control","path":"control/wccuea1_pdf.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1_pdf.control","reason":"control_match"},{"kind":"docdef","path":"docdef/WCCUEA11.dfa","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/docdef/WCCUEA11.dfa","reason":"control_format_dfa"},{"kind":"script","path":"master/update_stmt_insert.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/update_stmt_insert.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/xml2bar_parser_v3.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/xml2bar_parser_v3.py","reason":"call_graph_discovery"},{"kind":"script","path":"master/func_set1.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set1.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/archival_process.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/archival_process.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/isisdisk.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/isisdisk.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/proc_arg_verify.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/proc_arg_verify.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/verify_custom_archival.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/verify_custom_archival.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/func_set2.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set2.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/daily_mail.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/daily_mail.py","reason":"call_graph_discovery"},{"kind":"script","path":"master/afp2pdf.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/afp2pdf.py","reason":"call_graph_discovery"},{"kind":"script","path":"master/copyToClientPickup.pl","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/copyToClientPickup.pl","reason":"call_graph_discovery"},{"kind":"script","path":"master/func_set3.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set3.sh","reason":"call_graph_discovery"},{"kind":"script","path":"master/get_md5_value.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/get_md5_value.sh","reason":"call_graph_discovery"}]},"other_candidates_summary":[{"rank":2,"key":"proc:wccuml1","display_name":"WCCU - Mortgage Statement","score":52,"file_count":22},{"rank":3,"key":"proc:wccumv1","display_name":"WCCU - Credit Card Statements","score":52,"file_count":10}],"all_candidates":[{"key":"proc:wccuea1","name":"wccuea1","display_name":"WCCU - Escrow Analysis","score":52.0,"score_breakdown":[["cid_prefix",15.0],["has_scripts",10.0],["has_inserts",10.0],["has_control",10.0],["has_dfa",5.0],["keyword:wccu",2.0]],"files":[{"kind":"procs","path":"procs/wccuea1.procs","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/procs/wccuea1.procs"},{"kind":"script","path":"master/wccu_ea_process.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccu_ea_process.sh"},{"kind":"insert","path":"insert/wccuea1.ins","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/insert/wccuea1.ins"},{"kind":"control","path":"control/wccuea1.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1.control"},{"kind":"control","path":"control/wccuea1_template.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1_template.control"},{"kind":"control","path":"control/wccuea1_pdf.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1_pdf.control"},{"kind":"docdef","path":"docdef/WCCUEA11.dfa","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/docdef/WCCUEA11.dfa"},{"kind":"script","path":"master/update_stmt_insert.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/update_stmt_insert.sh"},{"kind":"script","path":"master/xml2bar_parser_v3.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/xml2bar_parser_v3.py"},{"kind":"script","path":"master/func_set1.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set1.sh"},{"kind":"script","path":"master/archival_process.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/archival_process.sh"},{"kind":"script","path":"master/isisdisk.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/isisdisk.sh"},{"kind":"script","path":"master/proc_arg_verify.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/proc_arg_verify.sh"},{"kind":"script","path":"master/verify_custom_archival.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/verify_custom_archival.sh"},{"kind":"script","path":"master/func_set2.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set2.sh"},{"kind":"script","path":"master/daily_mail.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/daily_mail.py"},{"kind":"script","path":"master/afp2pdf.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/afp2pdf.py"},{"kind":"script","path":"master/copyToClientPickup.pl","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/copyToClientPickup.pl"},{"kind":"script","path":"master/func_set3.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set3.sh"},{"kind":"script","path":"master/get_md5_value.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/get_md5_value.sh"}]},{"key":"proc:wccuml1","name":"wccuml1","display_name":"WCCU - Mortgage Statement","score":52.0,"score_breakdown":[["cid_prefix",15.0],["has_scripts",10.0],["has_inserts",10.0],["has_control",10.0],["has_dfa",5.0],["keyword:wccu",2.0]],"files":[{"kind":"procs","path":"procs/wccuml1.procs","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/procs/wccuml1.procs"},{"kind":"script","path":"master/wccuml1_process.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccuml1_process.sh"},{"kind":"insert","path":"insert/wccuml1.ins","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/insert/wccuml1.ins"},{"kind":"control","path":"control/wccuml1_correlation_template.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuml1_correlation_template.control"},{"kind":"control","path":"control/wccuml1.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuml1.control"},{"kind":"control","path":"control/wccuml1_pdf.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuml1_pdf.control"},{"kind":"docdef","path":"docdef/WCCUML11.dfa","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/docdef/WCCUML11.dfa"},{"kind":"script","path":"master/update_stmt_insert.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/update_stmt_insert.sh"},{"kind":"script","path":"master/xml2bar_parser_v3.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/xml2bar_parser_v3.py"},{"kind":"script","path":"master/func_set1.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set1.sh"},{"kind":"script","path":"master/wccu-final_v3.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccu-final_v3.py"},{"kind":"script","path":"master/isisdisk.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/isisdisk.sh"},{"kind":"script","path":"master/proc_arg_verify.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/proc_arg_verify.sh"},{"kind":"script","path":"master/daily_mail.pl","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/daily_mail.pl"},{"kind":"script","path":"master/verify_custom_archival.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/verify_custom_archival.sh"},{"kind":"script","path":"master/vcp2.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/vcp2.sh"},{"kind":"script","path":"master/func_set2.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set2.sh"},{"kind":"script","path":"master/daily_mail.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/daily_mail.py"},{"kind":"script","path":"master/afp2pdf.py","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/afp2pdf.py"},{"kind":"script","path":"master/copyToClientPickup.pl","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/copyToClientPickup.pl"},{"kind":"script","path":"master/func_set3.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set3.sh"},{"kind":"script","path":"master/get_md5_value.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/get_md5_value.sh"}]},{"key":"proc:wccumv1","name":"wccumv1","display_name":"WCCU - Credit Card Statements","score":52.0,"score_breakdown":[["cid_prefix",15.0],["has_scripts",10.0],["has_inserts",10.0],["has_control",10.0],["has_dfa",5.0],["keyword:wccu",2.0]],"files":[{"kind":"procs","path":"procs/wccumv1.procs","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/procs/wccumv1.procs"},{"kind":"script","path":"master/stmt_process.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/stmt_process.sh"},{"kind":"insert","path":"insert/wccumv1.ins","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/insert/wccumv1.ins"},{"kind":"control","path":"control/wccumv1.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccumv1.control"},{"kind":"control","path":"control/wccumv1_pdf.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccumv1_pdf.control"},{"kind":"control","path":"control/wccumv1_xml_template.control","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccumv1_xml_template.control"},{"kind":"docdef","path":"docdef/WCCUMV11.dfa","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/docdef/WCCUMV11.dfa"},{"kind":"script","path":"master/wccumv1_report_handler.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccumv1_report_handler.sh"},{"kind":"script","path":"master/wccumv1_plugin.pl","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccumv1_plugin.pl"},{"kind":"script","path":"master/wccumv1_archival_process.sh","abs_path":"/home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccumv1_archival_process.sh"}]}]}
+
+4. Open file
+{"path":"procs/wccuea1.procs","kind":"procs","content":"\t\t\tPROCESSING SPECIFICATION SHEET\n\t\t\t------------------------------\nFirm: Example Credit Union     Production Type: Escrow Analysis\nCID: WCCU                                 Created: 08/08/2023\n----------------------------------------------------------------------------\n\n\n\nFTP folder:  \nData File Location: /d/ftpbu/wccu_wrgbu/ea/\n\n\nInput file:\n----------\n\nNaming Convention:\n----------\nData File: WCCU_ea_<mmddyyyy>_<seg#>.zip.pgp\n\n      Zip contains:\n            <yyyymmdd>_<hhmmss>_000.Escrow_Analysis_for_<yyyy>_<mm>_<dd>.xml\n            \n            \n         \n \n      Lookup Files:\n            wccu_escrow_PMI_inclusion_list-<mmddyyyy>.csv \n            wccu_escrow_exclusion-<mmddyyyy>.csv\n\n\n\n\nOutput file:\n-----------\nMedia: afp\nPrint Location: TX  \n\nProcessing: Run on linux-server\n-----------  \n\n__File Setup Before Processing:\t/home/insert/wccuea1.ins\n\t\t\t     \n__Shell Script: /home/master/wccu_ea_process.sh [segment] [bypass|0] {optional:n,s,f,e}\n               \n__Log File:  /d/wccu/wccuea*.log\n             \t    \n__Be sure to check that ALL print files have been created and are complete\n\n__Check counts from the previous run, and make sure you don't have duplicate counts.\n\nDPVS file: /d/wccu/wccuea1{segment}{cycleno}.print\n\nPrint files: /d/afpprint/wccuea1*\n    \n         \n\nArchival: ( e-option)\n------------\n__Check archival log file\n\nBACKUP:\n-------\nThe data files will backed up to\n/d/download/wccu/ea1/\n\n\n******************************************************************\nSpecial Instructions:\n\nIf reprocessing the same file is required, remove the cksum record for the\n   - remove the cksum record for the old file in cksum log file:\n     /home/keep/cksum_log/wccuea1_cksum.log\n\n\nReports:\n--------\n\nInvalid Address Report:\n/d/wccu/WCCU_Escrow Analysis Statements_invalid_mail_address_<mmddyy>_<segment>.csv.pgp\n\n- Created only if invalid address is found \n- Created for paper option \n\n","size":1995}
+
+5. Generate prompt
+{"prompt_text":"# Incident analysis\n\nYou are an external engineer analyzing an incident. Use the snapshot, current scope, and key files below to determine the most probable root cause. Return root cause, evidence, next checks, and a short ticket-ready fix or escalation.\n\n## Current scope\n- Snapshot: `/home/kts/snapshots/rhs_snapshot_snapshot_20260325`\n- Proc: `wccuea1`\n- Candidate: `WCCU - Escrow Analysis`\n- Files in scope: 20\n- Scope composition: procs 1, scripts 14, controls 3, inserts 1, docdef 1\n\n## Entry points\n- proc: wccuea1\n- script: wccu_ea_process.sh\n- control: wccuea1.control\n- control: wccuea1_template.control\n- docdef: WCCUEA11.dfa\n\n## Error / log / ticket text\n```\nPPCS0178E while reading PCSLOG\n```\n\n## Files to open\n- [procs] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/procs/wccuea1.procs\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/wccu_ea_process.sh\n- [insert] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/insert/wccuea1.ins\n- [control] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1.control\n- [control] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1_template.control\n- [control] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/control/wccuea1_pdf.control\n- [docdef] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/docdef/WCCUEA11.dfa\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/update_stmt_insert.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/xml2bar_parser_v3.py\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set1.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/archival_process.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/isisdisk.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/proc_arg_verify.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/verify_custom_archival.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set2.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/daily_mail.py\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/afp2pdf.py\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/copyToClientPickup.pl\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/func_set3.sh\n- [script] /home/kts/snapshots/rhs_snapshot_snapshot_20260325/master/get_md5_value.sh\n\n## Dependency diagram (Mermaid)\n\n```mermaid\ngraph TD\n    wccuea1[\"wccuea1\\nWCCU - Escrow Analysis\"]\n    wccu_ea_process[\"wccu_ea_process.sh\"]\n    wccuea1 -->|RUNS| wccu_ea_process\n    wccuea1_ins([\"wccuea1.ins\"])\n    wccuea1 -->|READS| wccuea1_ins\n    wccuea1_ctl[/\"wccuea1.control\"\\]\n    wccuea1 -->|control| wccuea1_ctl\n    wccuea1_template_ctl[/\"wccuea1_template.control\"\\]\n    wccuea1 -->|control| wccuea1_template_ctl\n    wccuea1_pdf_ctl[/\"wccuea1_pdf.control\"\\]\n    wccuea1 -->|control| wccuea1_pdf_ctl\n    WCCUEA11{{\"WCCUEA11.dfa\"}}\n    wccuea1 -->|dfa| WCCUEA11\n    afp2pdf[\"afp2pdf.py\"]\n    archival_process -->|calls| afp2pdf\n    daily_mail[\"daily_mail.py\"]\n    archival_process -->|calls| daily_mail\n    copyToClientPickup[\"copyToClientPickup.pl\"]\n    archival_process -->|calls| copyToClientPickup\n    get_md5_value[\"get_md5_value.sh\"]\n    func_set1 -->|calls| get_md5_value\n    daily_mail[\"daily_mail.py\"]\n    func_set1 -->|calls| daily_mail\n    archival_process[\"archival_process.sh\"]\n    wccu_ea_process -->|calls| archival_process\n    func_set1[\"func_set1.sh\"]\n    wccu_ea_process -->|calls| func_set1\n    func_set3[\"func_set3.sh\"]\n    wccu_ea_process -->|calls| func_set3\n    isisdisk[\"isisdisk.sh\"]\n    wccu_ea_process -->|calls| isisdisk\n    get_md5_value[\"get_md5_value.sh\"]\n    wccu_ea_process -->|calls| get_md5_value\n    verify_custom_archival[\"verify_custom_archival.sh\"]\n    wccu_ea_process -->|calls| verify_custom_archival\n    afp2pdf[\"afp2pdf.py\"]\n    wccu_ea_process -->|calls| afp2pdf\n    xml2bar_parser_v3[\"xml2bar_parser_v3.py\"]\n    wccu_ea_process -->|calls| xml2bar_parser_v3\n    daily_mail[\"daily_mail.py\"]\n    wccu_ea_process -->|calls| daily_mail\n    update_stmt_insert[\"update_stmt_insert.sh\"]\n    wccu_ea_process -->|calls| update_stmt_insert\n    proc_arg_verify[\"proc_arg_verify.sh\"]\n    wccu_ea_process -->|calls| proc_arg_verify\n    copyToClientPickup[\"copyToClientPickup.pl\"]\n    wccu_ea_process -->|calls| copyToClientPickup\n    func_set2[\"func_set2.sh\"]\n    wccu_ea_process -->|calls| func_set2\n    isisdisk[\"isisdisk.sh\"]\n    func_set3 -->|calls| isisdisk\n    afp2pdf[\"afp2pdf.py\"]\n    isisdisk -->|calls| afp2pdf\n    daily_mail[\"daily_mail.py\"]\n    isisdisk -->|calls| daily_mail\n    daily_mail[\"daily_mail.py\"]\n    verify_custom_archival -->|calls| daily_mail\n```\n\n## Expected answer\n- Most probable root cause or main impact area\n- Evidence from the provided files and input\n- Affected files and why they matter\n- Verification checklist\n- Proposed fix or change plan","saved_path":null,"scope_summary":{"file_count":20,"counts":{"procs":1,"scripts":14,"controls":3,"inserts":1,"docdef":1,"other":0},"runs_scripts":["master/wccu_ea_process.sh"],"controls":["control/wccuea1.control","control/wccuea1_template.control","control/wccuea1_pdf.control"],"docdefs":["docdef/WCCUEA11.dfa"],"read_order":["proc: wccuea1","script: wccu_ea_process.sh","control: wccuea1.control","control: wccuea1_template.control","docdef: WCCUEA11.dfa"]},"scenario":"incident","impl_mode":"scope_prompt_v1","mermaid_included":true}
+
+6. Open diagram payload
+{"mermaid_code":"graph TD\n    wccuea1[\"wccuea1\\nWCCU - Escrow Analysis\"]\n    wccu_ea_process[\"wccu_ea_process.sh\"]\n    wccuea1 -->|RUNS| wccu_ea_process\n    wccuea1_ins([\"wccuea1.ins\"])\n    wccuea1 -->|READS| wccuea1_ins\n    wccuea1_ctl[/\"wccuea1.control\"\\]\n    wccuea1 -->|control| wccuea1_ctl\n    wccuea1_template_ctl[/\"wccuea1_template.control\"\\]\n    wccuea1 -->|control| wccuea1_template_ctl\n    wccuea1_pdf_ctl[/\"wccuea1_pdf.control\"\\]\n    wccuea1 -->|control| wccuea1_pdf_ctl\n    WCCUEA11{{\"WCCUEA11.dfa\"}}\n    wccuea1 -->|dfa| WCCUEA11\n    afp2pdf[\"afp2pdf.py\"]\n    archival_process -->|calls| afp2pdf\n    daily_mail[\"daily_mail.py\"]\n    archival_process -->|calls| daily_mail\n    copyToClientPickup[\"copyToClientPickup.pl\"]\n    archival_process -->|calls| copyToClientPickup\n    get_md5_value[\"get_md5_value.sh\"]\n    func_set1 -->|calls| get_md5_value\n    daily_mail[\"daily_mail.py\"]\n    func_set1 -->|calls| daily_mail\n    archival_process[\"archival_process.sh\"]\n    wccu_ea_process -->|calls| archival_process\n    func_set1[\"func_set1.sh\"]\n    wccu_ea_process -->|calls| func_set1\n    func_set3[\"func_set3.sh\"]\n    wccu_ea_process -->|calls| func_set3\n    isisdisk[\"isisdisk.sh\"]\n    wccu_ea_process -->|calls| isisdisk\n    get_md5_value[\"get_md5_value.sh\"]\n    wccu_ea_process -->|calls| get_md5_value\n    verify_custom_archival[\"verify_custom_archival.sh\"]\n    wccu_ea_process -->|calls| verify_custom_archival\n    afp2pdf[\"afp2pdf.py\"]\n    wccu_ea_process -->|calls| afp2pdf\n    xml2bar_parser_v3[\"xml2bar_parser_v3.py\"]\n    wccu_ea_process -->|calls| xml2bar_parser_v3\n    daily_mail[\"daily_mail.py\"]\n    wccu_ea_process -->|calls| daily_mail\n    update_stmt_insert[\"update_stmt_insert.sh\"]\n    wccu_ea_process -->|calls| update_stmt_insert\n    proc_arg_verify[\"proc_arg_verify.sh\"]\n    wccu_ea_process -->|calls| proc_arg_verify\n    copyToClientPickup[\"copyToClientPickup.pl\"]\n    wccu_ea_process -->|calls| copyToClientPickup\n    func_set2[\"func_set2.sh\"]\n    wccu_ea_process -->|calls| func_set2\n    isisdisk[\"isisdisk.sh\"]\n    func_set3 -->|calls| isisdisk\n    afp2pdf[\"afp2pdf.py\"]\n    isisdisk -->|calls| afp2pdf\n    daily_mail[\"daily_mail.py\"]\n    isisdisk -->|calls| daily_mail\n    daily_mail[\"daily_mail.py\"]\n    verify_custom_archival -->|calls| daily_mail","live_url":"https://mermaid.live/edit#pako:eNqllk2PmzAQhv8K8qmVNlmFqJccKkVJrlXV3VUP68pyjUnQGrBsky0K-e8dxLdhkWlziIbxvM8Yj8fmhlgacLRDZ0XlxXs-4sSD3ztjGaebV4xqC-Pk5-Hw4q28k2Yqfff2CRW5jjRGvzoJ4ZRIlTKudS3tedb6MggGqrdafS1-vHx7Kmz5IIxEif7UzWUNj0D6PIE67Y81q5YNOcyI18eOw9LEqFRghPHEvOrRoq8e4gyPpaCGW9zWvzRBnzfMJIPQTgKupfyaUkWW5TztN5vbDaPGXgchxeh-H7NgoGgl1TANpQ9EqEttrWXeFpgqdomuVDT1rCZEhdBFI6wCAxqJnMTwD6DuwZXVKapYlsr8OT2IiCfme8TeMgnYsXMthRN-rKw0Z25IHHwhIMs4ZBg89zd6mCWMaG42feog2nkZJlH2-9svU1bHctl92Ou6QZUsmTUJALe2I7GNH6K2PdR2IWpbRUZwEAWRfgNSYzqCmvCFZZ0hThT3ylUU5oRl2qQxaRYW-NMDjommxQ69OVf0fmv-iYX_myoiqdJckWtZqJHPETzSOW_7Gai9-TMZlKenNrEpz36uDFDHTsf1HQsrSRkKy30mVQEgheVx5Fuqfz6_ZlJ8dHw17eP3Ws9f2Hq-U-u1jfpx083u1Sb0f-6PKYa9dRww0_02DUUPKOYKrAA-reCCNRcec4x2HsB5SDNh4JqFIJqZ9ClPGNoZlfGHerMeIwqfY3HlvP8FMeVkZA"}
+
+7. Search knowledge only (PPCS0178E, current scope)
+[{"path":"message_codes/PPCS0178E","kind":"message_code","snippet":"Error during reading of PCSLOG file occured.\nReason: Related: Specified PCSLOG file could not be read. Follow up of PPCS1057E, could be followed by POTR0626E.","match_type":"knowledge","preview_title":"PPCS0178E (E)","preview_content":"Code: PPCS0178E\nSeverity: E\nTitle: Error during reading of PCSLOG file occured.\nError during reading of PCSLOG file occured.\nReason: Related: Specified PCSLOG file could not be read. Follow up of PPCS1057E, could be followed by POTR0626E.\nSource PDF: $SNAPROOT/refs/papyrus/Papyrus_DocExec_message_codes.pdf"},{"path":"message_codes/PPCS1057E","kind":"message_code","snippet":"osScanDir_t failed because FindFirstW returns error 2: The system cannot find the file specified.\nReason: Related: Specified PCSLOG file could not be read. Followed by PPCS0178E, P","match_type":"knowledge","preview_title":"PPCS1057E (E)","preview_content":"Code: PPCS1057E\nSeverity: E\nTitle: osScanDir_t failed because FindFirstW returns error 2: The system cannot find the\nosScanDir_t failed because FindFirstW returns error 2: The system cannot find the file specified.\nReason: Related: Specified PCSLOG file could not be read. Followed by PPCS0178E, POTR0626E\nSource PDF: $SNAPROOT/refs/papyrus/Papyrus_DocExec_message_codes.pdf"}]
+
+8. Search all (PPCS0178E, current scope)
+[{"path":"message_codes/PPCS0178E","kind":"message_code","snippet":"Error during reading of PCSLOG file occured.\nReason: Related: Specified PCSLOG file could not be read. Follow up of PPCS1057E, could be followed by POTR0626E.","match_type":"knowledge","preview_title":"PPCS0178E (E)","preview_content":"Code: PPCS0178E\nSeverity: E\nTitle: Error during reading of PCSLOG file occured.\nError during reading of PCSLOG file occured.\nReason: Related: Specified PCSLOG file could not be read. Follow up of PPCS1057E, could be followed by POTR0626E.\nSource PDF: $SNAPROOT/refs/papyrus/Papyrus_DocExec_message_codes.pdf"},{"path":"message_codes/PPCS1057E","kind":"message_code","snippet":"osScanDir_t failed because FindFirstW returns error 2: The system cannot find the file specified.\nReason: Related: Specified PCSLOG file could not be read. Followed by PPCS0178E, P","match_type":"knowledge","preview_title":"PPCS1057E (E)","preview_content":"Code: PPCS1057E\nSeverity: E\nTitle: osScanDir_t failed because FindFirstW returns error 2: The system cannot find the\nosScanDir_t failed because FindFirstW returns error 2: The system cannot find the file specified.\nReason: Related: Specified PCSLOG file could not be read. Followed by PPCS0178E, POTR0626E\nSource PDF: $SNAPROOT/refs/papyrus/Papyrus_DocExec_message_codes.pdf"}]
+
+9. Search files only path mode (wccuea1, current scope, procs)
+[{"path":"procs/wccuea1.procs","kind":"procs","snippet":"procs/wccuea1.procs","match_type":"path"}]
+
+10. Create workspace
+
+data: {"step": 22, "total": 22, "label": "Generating scripts..."}
+
+data: {"step": 22, "total": 22, "label": "Done", "done": true, "status": "created", "workspace": "/home/kts/workspaces/ui_console_smoke_20260325_121014", "workspace_win": "\\\\wsl.localhost\\Debian\\home\\kts\\workspaces\\ui_console_smoke_20260325_121014", "name": "ui_console_smoke_20260325_121014", "files_copied": 20, "copy_errors": [], "pull_script": "/home/kts/workspaces/ui_console_smoke_20260325_121014/scripts/pull_from_rhs.sh"}
+
+
+
+11. Static checks served live
+live_app_js_exit_code=0

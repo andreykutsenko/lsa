@@ -1,0 +1,7 @@
+Command: python3 -m pytest
+Exit code: 1
+Output:
+/usr/bin/python3: No module named pytest
+
+Result:
+- Unit test command could not run in this environment because pytest is not installed.

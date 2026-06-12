@@ -1,0 +1,3 @@
+     9076  2020-02-02 00:00   lsa/changedocs/prompts/system_cab.md
+    13359  2020-02-02 00:00   lsa/changedocs/templates/ptf_template.docx
+    31182  2020-02-02 00:00   lsa/changedocs/templates/qa_template.docx

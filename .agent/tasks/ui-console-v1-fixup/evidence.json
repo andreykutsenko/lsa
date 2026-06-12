@@ -1,0 +1,94 @@
+{
+  "task_id": "ui-console-v1-fixup",
+  "overall_status": "PASS",
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "text": "`Overview` in the web UI is refocused around `Current scope` as the primary operator surface instead of snapshot index statistics. The central content must expose the active snapshot, selected candidate or proc, a short scope-composition summary, and the main actions `Open files`, `Create workspace`, `Copy file list`, `Generate prompt`, and `Open diagram`.",
+      "status": "PASS",
+      "proof": [
+        "Current scope block with required actions is implemented in lsa/web/static/app.js:231-278.",
+        "Overview renders Current scope first in lsa/web/static/app.js:969-983."
+        ,"Bundle actions now route Open files and Create workspace to a single in-page target in lsa/web/static/app.js:283-296 and lsa/web/static/app.js:940-947."
+        ,"Live scope action flow (file open, prompt, diagram, workspace) is captured in raw/test-integration.txt."
+      ],
+      "gaps": []
+    },
+    {
+      "id": "AC2",
+      "text": "Internal counters and index-oriented metrics such as artifacts, graph nodes, graph edges, case-card counts, and message-code counts are demoted out of the central work surface into a secondary `Diagnostics` area. Any explanatory side cards on the overview or bundle pages must read as supporting context rather than primary interactive panels.",
+      "status": "PASS",
+      "proof": [
+        "Diagnostics section contains internal counters in lsa/web/static/app.js:1039-1056.",
+        "The duplicate explanatory side card was removed; bundle guidance is now inline in lsa/web/static/app.js:731-745.",
+        "The duplicate inline Diagram section was removed from the bundle screen, leaving a single primary action entry point."
+      ],
+      "gaps": []
+    },
+    {
+      "id": "AC3",
+      "text": "Search is operator-oriented and clearly separates file/artifact search from knowledge search. The UI and API together support: `Path` vs `Content`; `Current scope` vs `Whole snapshot`; kind filtering for file artifacts; and an explicit result-space distinction such as `Files`, `Knowledge`, and `All`, so message codes and case cards are not mixed indistinguishably with file-path search.",
+      "status": "PASS",
+      "proof": [
+        "Explicit All/Files/Knowledge controls exist in lsa/web/static/app.js:1135-1144.",
+        "The search help text no longer breaks the template literal in lsa/web/static/app.js:1144, and app.js parsing is covered by tests/test_web_server.py:197-209.",
+        "Results are rendered in separate Knowledge and Files groups in lsa/web/static/app.js:1211-1238.",
+        "Backend search supports a space query in lsa/web/server.py:1160-1195 and no longer drops knowledge hits when scope=current.",
+        "Knowledge-only and current-scope mixed search behavior is covered by tests/test_web_server.py:166-196.",
+        "Live smoke test finds PPCS0178E for Knowledge and All with scope=current, and finds a proc path for Files+Path; see raw/test-integration.txt."
+      ],
+      "gaps": []
+    },
+    {
+      "id": "AC4",
+      "text": "Prompt generation works from the already selected `Current scope` and exposes exactly two explicit V1 scenarios: `Incident analysis` and `Change request analysis`. The operator does not need to pick a separate candidate inside the prompt screen, and generated prompt output reflects the chosen scenario and scope.",
+      "status": "PASS",
+      "proof": [
+        "Prompt UI uses current scope and only two scenarios in lsa/web/static/app.js:1242-1328.",
+        "Scenario-aware backend prompt generation is implemented in lsa/web/server.py:83-91 and lsa/web/server.py:710-739.",
+        "Targeted tests pass in .agent/tasks/ui-console-v1-fixup/raw/test-unit.txt."
+      ],
+      "gaps": []
+    },
+    {
+      "id": "AC5",
+      "text": "Snapshot creation supports optional enrichments through progressive disclosure rather than showing every optional source up front. V1 must support optional inputs for Papyrus PDF, incidents folder, research or log files folder, related files folder, prox folder, and any missing first-class operator input needed to include control or insert material as optional enrichments without broad backend redesign.",
+      "status": "PASS",
+      "proof": [
+        "Advanced snapshot panel includes control and insert inputs in lsa/web/static/app.js:462-471.",
+        "NewSnapshotRequest now carries control_path and insert_path in lsa/web/server.py:94-102.",
+        "Optional control and insert copying is implemented in lsa/web/server.py:432-438.",
+        "Request-model coverage is in tests/test_web_server.py:185-192."
+      ],
+      "gaps": []
+    },
+    {
+      "id": "AC6",
+      "text": "The implementation stays pragmatic and localized. The change set primarily targets `lsa/web/static/app.js`, `lsa/web/static/style.css`, `lsa/web/static/index.html`, and `lsa/web/server.py`, avoids broad backend refactors unless required for the acceptance criteria, and does not include dark mode unless it is nearly free.",
+      "status": "PASS",
+      "proof": [
+        "Touched production files remain localized to the expected web UI files plus targeted tests.",
+        "No dark-mode implementation is present in lsa/web/static/style.css.",
+        "py_compile, pytest, and node --check passed; see raw/build.txt, raw/test-unit.txt, and raw/lint.txt.",
+        "A live restart/reload and action-flow smoke test against a freshly restarted LSA server passed; see raw/test-integration.txt."
+      ],
+      "gaps": []
+    }
+  ],
+  "changed_files": [
+    "lsa/web/server.py",
+    "lsa/web/static/app.js",
+    "lsa/web/static/index.html",
+    "lsa/web/static/style.css",
+    "tests/test_web_server.py"
+  ],
+  "commands_for_fresh_verifier": [
+    "python3 -m py_compile lsa/web/server.py tests/test_web_server.py",
+    "python3 -m pytest tests/test_web_server.py",
+    "node --check lsa/web/static/app.js",
+    "restart python3 -m lsa.cli serve --no-open --port 18903 and verify / in headless Chrome plus /api/snapshot/select, /api/plan, /api/file, /api/prompt, /api/plan/mermaid, /api/workspace/create, /api/search, /api/snapshots, and /static/app.js"
+  ],
+  "known_gaps": [
+    "Earlier PASS status was incomplete because it did not include a live restart/reload smoke test of the browser bootstrap path."
+  ]
+}

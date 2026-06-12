@@ -1,0 +1,91 @@
+{
+  "task_id": "ui-tech-refresh",
+  "overall_status": "PASS",
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "text": "The UI shell presents a denser, more technical visual style on the main visible screens (`Snapshots`, `Build Bundle`, `Generate Prompt`, `Overview`, `Search`) by reducing oversized spacing and rounding, strengthening panel/border structure, and using a restrained professional palette while preserving all existing routes and interactions.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/style.css",
+        "lsa/web/static/index.html",
+        "lsa/web/static/app.js"
+      ],
+      "gaps": [
+        "No browser screenshot was captured in this environment."
+      ]
+    },
+    {
+      "id": "AC2",
+      "text": "Shared UI primitives in `style.css` are refreshed first so cards, buttons, fields, section headers, lists, modals, loading states, empty states, and status treatments look consistent across the application without broad rewrites to page logic.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/style.css",
+        "lsa/web/static/app.js"
+      ],
+      "gaps": [
+        "Some inline spacing styles remain in a few existing render branches to avoid unnecessary churn."
+      ]
+    },
+    {
+      "id": "AC3",
+      "text": "The first implementation pass adds higher-signal information hierarchy for technical workflows, including improved shell chrome, clearer section framing, denser file/search result presentation, and better readability of code-like content and metadata.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/static/index.html",
+        "lsa/web/static/style.css",
+        "lsa/web/static/app.js"
+      ],
+      "gaps": []
+    },
+    {
+      "id": "AC4",
+      "text": "Existing functionality is preserved: snapshot selection/deletion/creation, bundle generation, candidate switching, file preview, workspace creation, prompt generation, stats rendering, search, modal behavior, toasts, and Mermaid integration continue to work without API changes.",
+      "status": "PASS",
+      "proof": [
+        "lsa/web/server.py",
+        ".agent/tasks/ui-tech-refresh/raw/build.txt",
+        ".agent/tasks/ui-tech-refresh/raw/test-unit.txt"
+      ],
+      "gaps": [
+        "No interactive browser session was available for click-through validation."
+      ]
+    },
+    {
+      "id": "AC5",
+      "text": "Task artifacts under `.agent/tasks/ui-tech-refresh/` are updated with a concise implementation record, concrete verification evidence, and any skipped risky items are explicitly noted rather than partially implemented.",
+      "status": "PASS",
+      "proof": [
+        ".agent/tasks/ui-tech-refresh/spec.md",
+        ".agent/tasks/ui-tech-refresh/evidence.md",
+        ".agent/tasks/ui-tech-refresh/raw/build.txt",
+        ".agent/tasks/ui-tech-refresh/raw/test-unit.txt"
+      ],
+      "gaps": [
+        "The task-loop init step could not refresh .codex/agents because that path is read-only in this sandbox."
+      ]
+    }
+  ],
+  "changed_files": [
+    ".agent/tasks/ui-tech-refresh/spec.md",
+    ".agent/tasks/ui-tech-refresh/evidence.md",
+    ".agent/tasks/ui-tech-refresh/evidence.json",
+    ".agent/tasks/ui-tech-refresh/raw/build.txt",
+    ".agent/tasks/ui-tech-refresh/raw/test-unit.txt",
+    ".agent/tasks/ui-tech-refresh/raw/test-integration.txt",
+    ".agent/tasks/ui-tech-refresh/raw/lint.txt",
+    "lsa/web/static/index.html",
+    "lsa/web/static/style.css",
+    "lsa/web/static/app.js"
+  ],
+  "commands_for_fresh_verifier": [
+    "node --check lsa/web/static/app.js",
+    "./.venv/bin/pytest -q",
+    "./.venv/bin/python - <<'PY'\\nfrom lsa.web import server\\nprint('import-ok', server.app.title)\\nPY",
+    "python3 /home/kts/lsa/.agents/skills/repo-task-proof-loop/scripts/task_loop.py validate --task-id ui-tech-refresh"
+  ],
+  "known_gaps": [
+    "No automated browser rendering or screenshot proof was available locally.",
+    "Broad layout rewrites and backend/API changes were intentionally skipped as higher risk."
+  ]
+}

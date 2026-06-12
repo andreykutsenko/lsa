@@ -1,0 +1,20 @@
+{
+  "task_id": "ux-fixes-v1",
+  "date": "2026-06-11",
+  "criteria": {
+    "AC1": { "status": "PASS", "evidence": "progress-fill--warn + callout--warn on rsync/scan/copy errors in both SSE flows" },
+    "AC2": { "status": "PASS", "evidence": "rerunSearch() wired to all 4 filter change handlers" },
+    "AC3": { "status": "PASS", "evidence": "state.bundleForm, state.changeDocs input mirroring (7 fields), state.promptInput" },
+    "AC4": { "status": "PASS", "evidence": "_validatePrid with inline .field-error, used by Preview and Generate, clears on input" },
+    "AC5": { "status": "PASS", "evidence": "showModal copyText param + #modal-copy button; previewFile passes raw content; delete-confirm hides it" },
+    "AC6": { "status": "PASS", "evidence": "Number() coercion for files_copied / error counts in innerHTML" },
+    "AC7": { "status": "PASS", "evidence": "Captured column removed, title tooltip on freshness, grid 7->6 columns" },
+    "AC8": { "status": "PASS", "evidence": "Use button busy label + .is-busy row class, restored in finally" }
+  },
+  "checks": { "node_check": "OK", "pytest": "200 passed, 0 failed" },
+  "files_changed": [
+    "lsa/web/static/app.js",
+    "lsa/web/static/index.html",
+    "lsa/web/static/style.css"
+  ]
+}

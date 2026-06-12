@@ -1,0 +1,34 @@
+{
+  "task_id": "critical-fixes-v1",
+  "date": "2026-06-11",
+  "criteria": {
+    "AC1": {
+      "status": "PASS",
+      "evidence": "startswith(str( absent from lsa/web/server.py; 3 new containment tests pass"
+    },
+    "AC2": {
+      "status": "PASS",
+      "evidence": "_sanitize_component helper + applied at create_snapshot, workspace create, changedocs_generate; 5 new tests pass"
+    },
+    "AC3": {
+      "status": "PASS",
+      "evidence": "uv build --wheel; wheel contains system_cab.md, ptf_template.docx, qa_template.docx (raw/wheel_contents.txt)"
+    },
+    "AC4": {
+      "status": "PASS",
+      "evidence": "no '<username>' matches in lsa/; codes_pdf config lookup added; test_import_codes.py unmodified and passing"
+    },
+    "AC5": {
+      "status": "PASS",
+      "evidence": "185 passed full suite (raw/pytest_full.txt), 38 passed targeted (raw/pytest_targeted.txt)"
+    }
+  },
+  "test_counts": { "before": 177, "after": 185, "failed": 0 },
+  "files_changed": [
+    "lsa/web/server.py",
+    "lsa/cli.py",
+    "pyproject.toml",
+    "tests/test_web_server.py",
+    "tests/test_changedocs.py"
+  ]
+}

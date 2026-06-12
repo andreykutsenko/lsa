@@ -1,0 +1,7 @@
+Command: none
+Exit code: N/A
+Result: not run
+
+Notes:
+- No dedicated integration or browser automation test command is configured in this repository for the static SPA.
+- Manual verification in this environment is limited to source inspection and syntax or compile checks.

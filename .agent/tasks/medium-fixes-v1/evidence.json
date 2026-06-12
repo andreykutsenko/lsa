@@ -1,0 +1,30 @@
+{
+  "task_id": "medium-fixes-v1",
+  "date": "2026-06-11",
+  "criteria": {
+    "AC1": { "status": "PASS", "evidence": "ContextError on ssh timeout/OSError; DraftError on anthropic.APIError and double malformed JSON; 3 tests" },
+    "AC2": { "status": "PASS", "evidence": "usage accumulated via _track(), logged in finally; tests assert 250/50 and 220/30 sums" },
+    "AC3": { "status": "PASS", "evidence": "rsync loop catches TimeoutExpired/OSError; stream test: done=true with 5 rsync_errors" },
+    "AC4": { "status": "PASS", "evidence": "_search_fts catches sqlite3.OperationalError only, warns, returns []; 1 test" },
+    "AC5": { "status": "PASS", "evidence": "get_connection commit/rollback; commit kwarg on 5 insert fns; hot loops batched; 3 tests" },
+    "AC6": { "status": "PASS", "evidence": "tuple assignment in /api/plan; local captures in plan_mermaid, generate_prompt, workspace create, _current_scope_paths" },
+    "AC7": { "status": "PASS", "evidence": "_origin_allowed + http middleware, 403 for foreign Origin on mutating methods; 2 tests" },
+    "AC8": { "status": "PASS", "evidence": "_is_timestamp_like guard on ACCT pattern; 4 tests in test_redactor.py" },
+    "AC9": { "status": "PASS", "evidence": "200 passed full suite (raw/pytest_full.txt), 53 passed targeted (raw/pytest_targeted.txt)" }
+  },
+  "test_counts": { "before": 185, "after": 200, "failed": 0 },
+  "files_changed": [
+    "lsa/changedocs/context.py",
+    "lsa/changedocs/draft.py",
+    "lsa/web/server.py",
+    "lsa/cli.py",
+    "lsa/db/connection.py",
+    "lsa/graph/builder.py",
+    "lsa/utils/redactor.py",
+    "tests/test_changedocs.py",
+    "tests/test_web_server.py",
+    "tests/test_redactor.py",
+    "tests/test_db_transactions.py",
+    "tests/test_cli_search.py"
+  ]
+}

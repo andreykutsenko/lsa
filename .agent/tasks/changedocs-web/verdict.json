@@ -1,0 +1,93 @@
+{
+  "task_id": "changedocs-web",
+  "verifier": "task-verifier",
+  "date": "2026-06-08",
+  "working_dir": "/home/kts/lsa",
+  "interpreter": "project .venv (Python 3.14) via uv run",
+  "overall": "PASS",
+  "note": "Live ssh `rhs` and live Claude API are not runnable here; both are mock-covered (context.fetch and draft.draft_cab monkeypatched), never invoked live, per spec section 8.7.",
+  "baseline": {
+    "command": "uv run pytest -q",
+    "result": "170 passed"
+  },
+  "criteria": [
+    {
+      "id": "AC1",
+      "status": "PASS",
+      "command": "uv run python -c \"import lsa.changedocs, lsa.changedocs.context, lsa.changedocs.draft, lsa.changedocs.render; from lsa.changedocs.generate_cab import build_cab; print('import ok')\"",
+      "evidence": "Output 'import ok'. grep -rn 'sys.path' lsa/changedocs returns only doc/comment mentions, no manipulation. draft.py uses 'from .context import to_prompt'; render.py uses 'from .generate_cab import build_cab'; __init__.py 'from . import context, draft, render'."
+    },
+    {
+      "id": "AC2",
+      "status": "PASS",
+      "command": "ls -la lsa/changedocs/prompts/system_cab.md lsa/changedocs/templates/*.docx",
+      "evidence": "system_cab.md (4269 bytes), ptf_template.docx (13359 bytes), qa_template.docx (31182 bytes) all exist and non-empty. draft._load_system_prompt opens system_cab.md; render_ptf/render_qa open templates (exercised in AC7 tests)."
+    },
+    {
+      "id": "AC3",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py -q",
+      "evidence": "test_collect_diffs_whitelist_and_caps and test_ported_constants_unchanged pass. context.py confirms CODE_EXTENSIONS={dfa,sh,pl,py,procs,control,ovl,ins,lis,300}, MAX_TOTAL_DIFF_BYTES==200_000, MAX_FILE_DIFF_BYTES==60_000. _collect_diffs skips non-code/empty, truncates oversized per-file, skips on total cap."
+    },
+    {
+      "id": "AC4",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py::test_parse_header_extracts_fields -q",
+      "evidence": "parse_header extracts Description, Parallel ID, and numbered Files list (stops at '*' line). Test passes."
+    },
+    {
+      "id": "AC5",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py::test_dry_run_returns_estimate_no_api tests/test_changedocs.py::test_preview_route_no_api_no_usage_log -q",
+      "evidence": "Preview route monkeypatches draft_cab to raise AssertionError if called; it is never invoked. Response carries model_id, estimated_input_tokens, max_output_tokens (==4000), estimated_cost_usd, no_api_call=True. Test asserts usage.log file does not exist after preview. dry_run in draft.py makes no client construction and never calls _log_usage."
+    },
+    {
+      "id": "AC6",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py::test_generate_cab_only tests/test_changedocs.py::test_generate_cab_ptf_qa -q",
+      "evidence": "context.fetch and draft.draft_cab mocked. generate route always renders CAB; renders PTF/QA only when req.ptf/req.qa. Returns one /api/changedocs/download?ticket_id=...&name=... ref per produced file. Tests pass."
+    },
+    {
+      "id": "AC7",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py::test_render_ptf_fills_fields tests/test_changedocs.py::test_render_qa_clones_l_rows -q",
+      "evidence": "render_ptf fills JIRA/hours/programmer/date/live-date/parallel-id/description/files plus 'Total # File(s) Transferred: N'. render_qa clones the L1 row per item and fills L1..Ln. No API. Tests pass."
+    },
+    {
+      "id": "AC8",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py::test_download_streams_and_rejects_traversal -q",
+      "evidence": "Download route (server.py L1474-1491) resolves out_root and rejects when resolved path does not start with out_root (403); 404 for missing file; FileResponse with media_type application/vnd.openxmlformats-officedocument.wordprocessingml.document and Content-Disposition attachment. Test asserts missing->404 and traversal->403/404, re-download succeeds."
+    },
+    {
+      "id": "AC9",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_changedocs.py::test_draft_guardrails_present_in_source tests/test_changedocs.py::test_default_model_and_output_cap tests/test_changedocs.py::test_fetch_rejects_short_prid -q",
+      "evidence": "draft.py: key only from os.environ.get('ANTHROPIC_API_KEY'); no 'tools' arg to messages.create; system block has cache_control ephemeral; max_tokens=MAX_OUTPUT_TOKENS; exactly two 'resp = _call(' sites (one bounded call + one repair retry on JSONDecodeError); _log_usage called only after successful parse on a real call (not in dry_run). DEFAULT_MODEL=='sonnet', MAX_OUTPUT_TOKENS==4000. context.fetch raises ContextError when PRID not matching \\d{14,}; routes map ContextError->HTTPException(400)."
+    },
+    {
+      "id": "AC10",
+      "status": "PASS",
+      "command": "uv run python -c \"import docx, anthropic; print('deps ok')\"",
+      "evidence": "Output 'deps ok'. pyproject.toml [project.optional-dependencies].web = fastapi>=0.110.0, uvicorn[standard]>=0.29.0, python-docx>=1.1.0, anthropic>=0.39.0. Both resolve in the test env."
+    },
+    {
+      "id": "AC11",
+      "status": "PASS",
+      "command": "uv run pytest tests/test_web_server.py -q ; uv run python -c \"from lsa.web import server; paths={r.path for r in server.app.routes}; assert {'/api/changedocs/preview','/api/changedocs/generate','/api/changedocs/download'} <= paths; print('routes ok')\"",
+      "evidence": "Existing web tests included in full green suite; all three changedocs routes registered on server.app ('routes ok')."
+    },
+    {
+      "id": "AC12",
+      "status": "PASS",
+      "command": "node --check lsa/web/static/app.js",
+      "evidence": "node --check exits 0. index.html adds data-step=changedocs nav; app.js adds renderChangeDocsStep with PRID input, model select, Preview button, PTF/QA checkboxes, PTF JIRA/hours/live-date fields, download-links result area. test_app_js_parses_when_node_is_available in green suite."
+    },
+    {
+      "id": "AC13",
+      "status": "PASS",
+      "command": "uv run pytest -q",
+      "evidence": "170 passed, 0 failed. No regressions."
+    }
+  ]
+}

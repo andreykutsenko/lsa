@@ -1,0 +1,18 @@
+Task: ui-ide-redesign-v2
+Date: 2026-03-24T18:48:02-07:00
+
+Changed production files:
+- lsa/web/static/index.html
+- lsa/web/static/style.css
+- lsa/web/static/app.js
+
+Diff stat:
+ lsa/web/static/app.js     |  224 ++++++--
+ lsa/web/static/index.html |   33 +-
+ lsa/web/static/style.css  | 1349 ++++++++++++++++++++++++++++-----------------
+ 3 files changed, 1044 insertions(+), 562 deletions(-)
+
+Summary:
+- Reworked shell chrome into an Operator Workbench layout.
+- Rebuilt shared light-theme primitives with denser spacing, sharper borders, smaller radii, and restrained shadows.
+- Updated key screens: Snapshots, Build Bundle, Prompt, Search, and Overview.

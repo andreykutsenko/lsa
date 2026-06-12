@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- /home/kts/lsa/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/kts/lsa
+configfile: pyproject.toml
+plugins: anyio-4.13.0, cov-7.0.0
+collecting ... collected 13 items
+
+tests/test_changedocs.py::test_collect_diffs_whitelist_and_caps PASSED   [  7%]
+tests/test_changedocs.py::test_ported_constants_unchanged PASSED         [ 15%]
+tests/test_changedocs.py::test_parse_header_extracts_fields PASSED       [ 23%]
+tests/test_changedocs.py::test_fetch_rejects_short_prid PASSED           [ 30%]
+tests/test_changedocs.py::test_dry_run_returns_estimate_no_api PASSED    [ 38%]
+tests/test_changedocs.py::test_preview_route_no_api_no_usage_log[asyncio] PASSED [ 46%]
+tests/test_changedocs.py::test_generate_cab_only[asyncio] PASSED         [ 53%]
+tests/test_changedocs.py::test_generate_cab_ptf_qa[asyncio] PASSED       [ 61%]
+tests/test_changedocs.py::test_download_streams_and_rejects_traversal[asyncio] PASSED [ 69%]
+tests/test_changedocs.py::test_render_ptf_fills_fields PASSED            [ 76%]
+tests/test_changedocs.py::test_render_qa_clones_l_rows PASSED            [ 84%]
+tests/test_changedocs.py::test_draft_guardrails_present_in_source PASSED [ 92%]
+tests/test_changedocs.py::test_default_model_and_output_cap PASSED       [100%]
+
+============================== 13 passed in 0.49s ==============================

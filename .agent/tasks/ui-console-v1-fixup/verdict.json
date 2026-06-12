@@ -1,0 +1,51 @@
+{
+  "task_id": "ui-console-v1-fixup",
+  "overall_verdict": "PASS",
+  "criteria": [
+    {
+      "id": "AC1",
+      "status": "PASS",
+      "reason": "Overview and bundle now center Current scope, and the action row leads to working file/workspace/prompt/diagram flows."
+    },
+    {
+      "id": "AC2",
+      "status": "PASS",
+      "reason": "Internal counters are demoted into Diagnostics and duplicate primary-looking bundle surfaces were removed."
+    },
+    {
+      "id": "AC3",
+      "status": "PASS",
+      "reason": "Search now has explicit All/Files/Knowledge separation plus mode, scope, kind controls, and live Papyrus-code search works even with scope=current."
+    },
+    {
+      "id": "AC4",
+      "status": "PASS",
+      "reason": "Prompt generation uses the selected Current scope with the two required scenarios."
+    },
+    {
+      "id": "AC5",
+      "status": "PASS",
+      "reason": "Snapshot creation uses progressive disclosure and now includes optional control and insert enrichments."
+    },
+    {
+      "id": "AC6",
+      "status": "PASS",
+      "reason": "Changes remain localized to the intended UI/server files without dark-mode scope creep."
+    }
+  ],
+  "commands_run": [
+    "python3 -m py_compile lsa/web/server.py tests/test_web_server.py",
+    "python3 -m pytest tests/test_web_server.py",
+    "node --check lsa/web/static/app.js",
+    "restart python3 -m lsa.cli serve --no-open --port 18903 and verify / in headless Chrome plus /api/snapshot/select, /api/plan, /api/file, /api/prompt, /api/plan/mermaid, /api/workspace/create, /api/search, /api/snapshots, and /static/app.js",
+    "python3 /home/kts/lsa/.agents/skills/repo-task-proof-loop/scripts/task_loop.py validate --task-id ui-console-v1-fixup"
+  ],
+  "artifacts_used": [
+    ".agent/tasks/ui-console-v1-fixup/evidence.md",
+    ".agent/tasks/ui-console-v1-fixup/evidence.json",
+    ".agent/tasks/ui-console-v1-fixup/raw/build.txt",
+    ".agent/tasks/ui-console-v1-fixup/raw/test-unit.txt",
+    ".agent/tasks/ui-console-v1-fixup/raw/test-integration.txt",
+    ".agent/tasks/ui-console-v1-fixup/raw/lint.txt"
+  ]
+}

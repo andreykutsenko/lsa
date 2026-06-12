@@ -1,0 +1,56 @@
+{
+  "task_id": "ux-fixes-v1",
+  "verifier_date": "2026-06-11",
+  "reverification_of": "AC3 fix (escapeHtml quote escaping)",
+  "overall": "PASS",
+  "criteria": {
+    "AC1": {
+      "status": "PASS",
+      "evidence": "Snapshot flow: app.js:578-589 computes hasErrors from rsync_errors/scan_ok, toggles progress-fill--warn on #ns-progress-fill and callout--warn. Workspace flow: app.js:888-898 does the same for copy_errors and shows the count. Re-inspected after the AC3 fix; untouched."
+    },
+    "AC2": {
+      "status": "PASS",
+      "evidence": "rerunSearch closure (app.js:1185-1188) runs performSearch only when query is non-empty; wired to mode (1189-1191), scope (1192-1194), kind (1195-1198), space (1199-1201). Re-inspected; untouched."
+    },
+    "AC3": {
+      "status": "PASS",
+      "evidence": "escapeHtml (app.js:65-69) now appends .replace(/\"/g, '&quot;').replace(/'/g, '&#39;') to the div.innerHTML serialization, exactly the fix prescribed in the prior problems.md. Attribute sites verified: #f-title/#f-cid/#f-jobid value=\"...\" (app.js:762-764), #cd-prid (1431), #cd-jira (1460), #cd-hours (1464), #cd-live-date (1469), #cd-qa-job (1475), plus title= (655), data-path (954, 1243-1244), href (1742) all interpolate inside double-quoted attributes; &quot; decodes back to a literal quote in element.value, so values containing quotes survive re-render and the attribute-injection vector is closed. Roundtrip is stable: input handlers mirror the decoded raw value back to state (bundleForm 776-780, changeDocs 1528-1540, promptInput 1354-1356), and escapeHtml is always applied to the raw state value at render time, so no double-escaping accumulates. Textareas #prompt-input (1321), #cd-qa-items (1479), #cd-extra (1484): &quot;/&#39; in element content render as literal characters; correct."
+    },
+    "AC4": {
+      "status": "PASS",
+      "evidence": "_validatePrid (app.js:1654-1667) tests /^\\d{14,}$/ with distinct inline messages in #cd-prid-error; changeDocsPreview (1671) and changeDocsGenerate (1685) return before any API call when invalid; error clears on PRID input (1535-1538). Re-inspected; untouched."
+    },
+    "AC5": {
+      "status": "PASS",
+      "evidence": "showModal(title, content, copyText = null) (app.js:89-96) hides #modal-copy when copyText is null and wires copyToClipboard otherwise; previewFile passes raw un-numbered content; showKnowledgeModal calls with 2 args. Re-inspected; untouched."
+    },
+    "AC6": {
+      "status": "PASS",
+      "evidence": "files_copied as Number(finalResult.files_copied) || 0 (app.js:894); copy error count via Number(copyErrors) (895); rsync error count via Number(...) (583). Re-inspected; untouched."
+    },
+    "AC7": {
+      "status": "PASS",
+      "evidence": "6-column header without Captured; freshness cell carries title=\"Captured: ...\" (app.js:655) — now also quote-safe via the AC3 fix. grid-template-columns with 6 entries (style.css:1171-1174); responsive variant unaffected. Re-inspected; untouched."
+    },
+    "AC8": {
+      "status": "PASS",
+      "evidence": "Use button: disabled + 'Using…' + row .is-busy before the request (app.js:678-681); finally block restores all three on success and failure (697-701). Re-inspected; untouched."
+    }
+  },
+  "checks": {
+    "node_check": "node --check lsa/web/static/app.js — OK (rerun by verifier, 2026-06-11)",
+    "pytest": "uv run pytest -q — 200 passed in 0.87s (rerun by verifier, 2026-06-11)"
+  },
+  "fix_safety_review": {
+    "all_call_sites": "Every escapeHtml call site sits inside template literals assigned via innerHTML (element content or double-quoted attributes). In element content &quot;/&#39; render as literal \"/'; in attributes they decode on parse. No textContent = escapeHtml(...) usage and no nested escapeHtml(escapeHtml(...)) anywhere (grep verified), so no double-escaping is introduced.",
+    "highlightSnippet": "app.js:1267-1271 regex-matches the raw query against escapeHtml output; a query containing a literal quote no longer highlights inside snippets, and a query like 'quot' can mark inside the entity. This is the same pre-existing cosmetic edge that already applied to &amp;/&lt;/&gt; before the fix; display-only, not a regression of any AC."
+  },
+  "scope": {
+    "frontend_only": true,
+    "notes": "Only change since the prior FAIL verdict is the one-line escapeHtml extension at app.js:68; all line anchors cited in the previous verdict still match. Working-tree diffs to server.py/pyproject/uv.lock belong to other tasks (critical-fixes-v1/medium-fixes-v1/changedocs-web), not ux-fixes-v1."
+  },
+  "out_of_scope_observations": [
+    "Pre-existing search Preview index mismatch (app.js:1235 renderHit per-section index vs app.js:1277 lookup against the full state.searchResults array): when both knowledge and file sections are non-empty, Preview opens the wrong hit. Untouched by ux-fixes-v1; worth a follow-up task.",
+    "state.changeDocs initial object lacks explicit prid/jira/hours/liveDate/qaJob/qaItems keys; templates compensate with ?? '' so behavior is correct, but declaring the keys would make the state shape explicit."
+  ]
+}

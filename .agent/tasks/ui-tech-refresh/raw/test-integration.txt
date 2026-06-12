@@ -1,0 +1,6 @@
+No dedicated integration test target is present in this repository for the static FastAPI-served SPA.
+
+Manual verification basis for this task:
+- inspected rendered route markup in `lsa/web/static/app.js`
+- preserved existing API endpoints and event wiring
+- validated JS syntax and FastAPI server import path

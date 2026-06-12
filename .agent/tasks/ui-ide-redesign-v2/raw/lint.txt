@@ -1,0 +1,11 @@
+Command: python3 -m compileall lsa
+Exit code: 0
+Result: PASS
+
+Command: node --check /home/kts/lsa/lsa/web/static/app.js
+Exit code: 0
+Result: PASS
+
+Notes:
+- No dedicated frontend lint configuration was found.
+- JS syntax validation passed for the updated SPA entry file after the final layout and surface changes.

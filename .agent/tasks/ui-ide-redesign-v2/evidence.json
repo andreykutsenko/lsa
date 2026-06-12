@@ -1,0 +1,153 @@
+{
+  "task_id": "ui-ide-redesign-v2",
+  "overall_status": "PASS",
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "text": "The application shell is visibly redesigned into a denser IDE-like workbench with stronger top bar and sidebar chrome, smaller radii, restrained shadows, and clearer panel boundaries while preserving the existing single-page navigation and API-driven behavior.",
+      "status": "PASS",
+      "proof": [
+        {
+          "type": "file",
+          "path": "lsa/web/static/index.html",
+          "summary": "Shell markup now includes operator-workbench topbar, status chips, and denser sidebar structure."
+        },
+        {
+          "type": "file",
+          "path": "lsa/web/static/style.css",
+          "summary": "Shared shell styles define denser layout, sharper borders, smaller radii, and restrained shadows."
+        }
+      ],
+      "gaps": [
+        "No browser screenshot was captured in this environment."
+      ]
+    },
+    {
+      "id": "AC2",
+      "text": "Shared UI primitives in lsa/web/static/style.css are updated so buttons, form controls, cards, panels, section headers, modals, tables or list-like file/search surfaces, and empty/loading/error states consistently follow the frozen Operator Workbench direction instead of the current softer aesthetic.",
+      "status": "PASS",
+      "proof": [
+        {
+          "type": "file",
+          "path": "lsa/web/static/style.css",
+          "summary": "Centralized visual system refresh covers buttons, fields, panels, metadata badges, lists, modal surfaces, status states, and toast styling."
+        }
+      ],
+      "gaps": [
+        "No dedicated frontend lint configuration was found."
+      ]
+    },
+    {
+      "id": "AC3",
+      "text": "At least three key screens receive a noticeable visual redesign through production markup and styling updates: Snapshots, Build Bundle, and Search are required, and additional improvements to Generate Prompt and Overview are encouraged when they can safely reuse the same primitive system.",
+      "status": "PASS",
+      "proof": [
+        {
+          "type": "file",
+          "path": "lsa/web/static/app.js",
+          "summary": "Snapshots, Build Bundle, Prompt, and Search renderers were updated with new side rails, denser panels, and stronger technical surfaces."
+        }
+      ],
+      "gaps": [
+        "Rendered browser screenshots were not captured."
+      ]
+    },
+    {
+      "id": "AC4",
+      "text": "Technical-content surfaces are made meaningfully more mature and readable, including stronger treatments for file lists, search hits, code or prompt output blocks, metadata badges, status messages, progress displays, and modal previews.",
+      "status": "PASS",
+      "proof": [
+        {
+          "type": "file",
+          "path": "lsa/web/static/style.css",
+          "summary": "File explorer, search results, prompt output, modal body, progress containers, and badge treatments were redesigned for technical readability."
+        },
+        {
+          "type": "file",
+          "path": "lsa/web/static/app.js",
+          "summary": "Result shells now carry explicit titles and denser content structures for files and search output."
+        }
+      ],
+      "gaps": [
+        "Mermaid interaction was preserved by source inspection and syntax validation, not a full browser run."
+      ]
+    },
+    {
+      "id": "AC5",
+      "text": "The redesign keeps functionality intact: snapshot creation, selection, deletion, bundle generation, candidate switching, file preview, workspace creation, prompt generation, stats rendering, search, modal close behavior, toast notifications, and Mermaid-related actions continue to work without backend or API changes unless strictly required.",
+      "status": "PASS",
+      "proof": [
+        {
+          "type": "command",
+          "path": ".agent/tasks/ui-ide-redesign-v2/raw/lint.txt",
+          "command": "node --check /home/kts/lsa/lsa/web/static/app.js",
+          "exit_code": 0,
+          "summary": "Updated SPA script parses successfully after the markup changes."
+        },
+        {
+          "type": "command",
+          "path": ".agent/tasks/ui-ide-redesign-v2/raw/lint.txt",
+          "command": "python3 -m compileall lsa",
+          "exit_code": 0,
+          "summary": "Python application modules compile successfully with the updated static asset set present."
+        },
+        {
+          "type": "file",
+          "path": "lsa/web/static/app.js",
+          "summary": "Existing API calls and interaction handlers remain intact; changes are scoped to presentation structure and class hooks."
+        }
+      ],
+      "gaps": [
+        "python3 -m pytest could not run because pytest is not installed."
+      ]
+    },
+    {
+      "id": "AC6",
+      "text": "Task artifacts under .agent/tasks/ui-ide-redesign-v2/ are updated with concise evidence, verification results, and a final verdict grounded in local checks and current repository state.",
+      "status": "PASS",
+      "proof": [
+        {
+          "type": "command",
+          "path": ".agent/tasks/ui-ide-redesign-v2/raw/build.txt",
+          "command": "git diff --stat -- . ':(exclude).agent/tasks/ui-ide-redesign-v2'",
+          "exit_code": 0,
+          "summary": "Build artifact records the production file delta for the redesign."
+        },
+        {
+          "type": "command",
+          "path": ".agent/tasks/ui-ide-redesign-v2/verdict.json",
+          "command": "python3 .agents/skills/repo-task-proof-loop/scripts/task_loop.py validate --task-id ui-ide-redesign-v2",
+          "exit_code": 0,
+          "summary": "Task artifact set validates successfully."
+        }
+      ],
+      "gaps": [
+        "Fresh-session verifier delegation was unavailable in this environment."
+      ]
+    }
+  ],
+  "changed_files": [
+    "lsa/web/static/index.html",
+    "lsa/web/static/style.css",
+    "lsa/web/static/app.js",
+    ".agent/tasks/ui-ide-redesign-v2/spec.md",
+    ".agent/tasks/ui-ide-redesign-v2/evidence.md",
+    ".agent/tasks/ui-ide-redesign-v2/evidence.json",
+    ".agent/tasks/ui-ide-redesign-v2/verdict.json",
+    ".agent/tasks/ui-ide-redesign-v2/raw/build.txt",
+    ".agent/tasks/ui-ide-redesign-v2/raw/test-unit.txt",
+    ".agent/tasks/ui-ide-redesign-v2/raw/test-integration.txt",
+    ".agent/tasks/ui-ide-redesign-v2/raw/lint.txt"
+  ],
+  "commands_for_fresh_verifier": [
+    "python3 -m compileall lsa",
+    "node --check /home/kts/lsa/lsa/web/static/app.js",
+    "python3 -m pytest",
+    "python3 .agents/skills/repo-task-proof-loop/scripts/task_loop.py validate --task-id ui-ide-redesign-v2"
+  ],
+  "known_gaps": [
+    "python3 -m pytest could not run because pytest is not installed.",
+    "No browser automation or screenshot capture tool was available for rendered UI proof.",
+    "Fresh-session verifier delegation was unavailable because repo-local agent install was blocked by a read-only .codex/agents target."
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "task_id": "medium-fixes-v1",
+  "verified_at": "2026-06-11",
+  "verifier": "task-verifier (independent rerun against current working tree)",
+  "overall": "PASS",
+  "criteria": {
+    "AC1": {
+      "status": "PASS",
+      "evidence": "context.py fetch() wraps subprocess.run in except TimeoutExpired/OSError -> ContextError (lines 143-153). draft.py draft_cab() wraps BOTH _call() invocations (initial and repair) in one try with except anthropic.APIError -> DraftError (lines 172-187); double malformed JSON raises DraftError('Model returned malformed JSON twice...') at line 185. Verified DraftError is NOT a subclass of anthropic.APIError (issubclass check: False), so it propagates past the APIError handler. Tests test_fetch_converts_ssh_timeout_to_context_error, test_draft_cab_converts_api_error, test_draft_cab_raises_draft_error_on_double_malformed_json pass."
+    },
+    "AC2": {
+      "status": "PASS",
+      "evidence": "draft_cab tracks usage per response via _track() into a summed dict; _log_usage is called in a finally block (draft.py lines 188-191), so spend is logged on success, on double-malformed failure (test asserts 220/30 sum), and on repair-retry success (test asserts 250/50 sum). No log line when zero tokens (preview test asserts no usage.log)."
+    },
+    "AC3": {
+      "status": "PASS",
+      "evidence": "_snapshot_create_stream rsync loop wraps subprocess.run in except TimeoutExpired / except OSError, appends to rsync_errors and continues (server.py lines 458-465); final done:true event always emitted. test_snapshot_stream_survives_rsync_timeout passes: all 5 jobs raise TimeoutExpired, final event has done=true and 5 rsync_errors. Workspace stream unchanged (pre-existing except Exception)."
+    },
+    "AC4": {
+      "status": "PASS",
+      "evidence": "cli.py _search_fts (lines 374-389) catches only sqlite3.OperationalError, prints '[yellow]Warning:[/yellow] FTS query ... failed: <msg>', returns []. Other exceptions propagate. test_search_fts_warns_and_returns_empty_on_operational_error passes."
+    },
+    "AC5": {
+      "status": "PASS",
+      "evidence": "get_connection commits on success, rolls back on BaseException, closes in finally (connection.py lines 27-34). insert_artifact/insert_proc/insert_node/insert_edge/insert_message_code all take commit: bool = True; default behavior unchanged. Hot loops pass commit=False with single trailing conn.commit(): scan loop (cli.py 172/186 + commit at 198), import-codes loop (cli.py 785 + commit at 794), build_graph_from_procs (builder.py 46/71/97 + existing commit at 75). Grep across lsa/ shows no other production callers of these insert_* functions, so all other flows keep default commit=True; explain/import-histories use upsert_* which still commit explicitly, so the exit-rollback cannot discard committed data. Idempotency preserved (INSERT OR REPLACE / get-or-insert unchanged). tests/test_db_transactions.py (3 tests) pass."
+    },
+    "AC6": {
+      "status": "PASS",
+      "evidence": "/api/plan assigns '_last_intent, _last_candidates = intent, candidates' in one tuple assignment (server.py:565). Grep of server.py shows the only remaining _last_* reads are the module declarations (547-548), the global statement (553), the tuple assignment (565), and four single local captures at handler entry: plan_mermaid (589), generate_prompt (795), create_workspace (966), _current_scope_paths (1161). All subsequent bounds checks and element accesses use the locals."
+    },
+    "AC7": {
+      "status": "PASS",
+      "evidence": "_origin_allowed pure helper (server.py 27-36) + @app.middleware('http') rejecting POST/PUT/PATCH/DELETE with disallowed Origin (403). Independently probed: None/'' -> allowed; localhost/127.0.0.1/[::1] with any port -> allowed; 'null', foreign hosts, localhost.evil.com, file:// -> rejected. Live TestClient check: foreign-Origin POST -> 403; no-Origin POST and localhost-Origin POST reach the handler; foreign-Origin GET -> 200. Unit tests test_origin_allowed_accepts_local_and_absent / _rejects_foreign_and_opaque pass."
+    },
+    "AC8": {
+      "status": "PASS",
+      "evidence": "redactor.py _is_timestamp_like validates 8-digit YYYYMMDD and 14-digit YYYYMMDDHHMMSS (year 1970-2099, month 01-12, day 01-31, HH<24/MM<60/SS<60); ACCT replacement is the _redact_account callable. Independently probed: 20260114, 20260114123456, 19700101, 20990101 preserved; 12345678, 99999999999999, 123456789012, 9876543210123456, 20261301, 19690101 redacted to [ACCT]. tests/test_redactor.py (4 tests) pass; EMAIL/SSN patterns untouched."
+    },
+    "AC9": {
+      "status": "PASS",
+      "evidence": "Fresh rerun: 'uv run pytest -q' -> 200 passed, 0 failed (matches evidence raw/pytest_full.txt). Targeted rerun of test_changedocs.py, test_web_server.py, test_redactor.py, test_db_transactions.py, test_cli_search.py -> 53 passed. New tests cover every item listed in the spec."
+    }
+  },
+  "test_run": { "command": "uv run pytest -q", "passed": 200, "failed": 0 },
+  "scope_check": {
+    "status": "OK",
+    "notes": "Diffs of lsa/cli.py, lsa/db/connection.py, lsa/graph/builder.py, lsa/utils/redactor.py, lsa/web/server.py match the spec. The codes_pdf/_configured_pdf_path changes in cli.py and the pyproject.toml/uv.lock/lsa/web/static changes in the working tree belong to earlier uncommitted tasks (critical-fixes-v1, changedocs-web, ui-* tasks per their frozen specs/evidence), not to medium-fixes-v1. No new dependencies and no static-file changes attributable to this task."
+  }
+}
