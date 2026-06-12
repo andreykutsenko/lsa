@@ -61,7 +61,7 @@ def _set_cell(cell, text, font_name=None, font_size=None, bold=None):
 
 
 def render_ptf(context, out_path, jira="", hours="", live_date="", date=None,
-               programmer="youruser", template=PTF_TEMPLATE):
+               programmer="", template=PTF_TEMPLATE):
     """Fill the PTF template from the parallel header + human-owned fields."""
     if date is None:
         date = datetime.date.today().strftime("%m/%d/%Y")
@@ -92,7 +92,7 @@ def render_ptf(context, out_path, jira="", hours="", live_date="", date=None,
 
 
 def render_qa(context, out_path, job_number="", date=None, l_items=None,
-              programmer="youruser", template=QA_TEMPLATE):
+              programmer="", template=QA_TEMPLATE):
     """Fill the QA checklist template from the header + L test-case items.
 
     Deterministic — no API call. l_items defaults to a single generic item;

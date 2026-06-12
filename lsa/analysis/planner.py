@@ -501,7 +501,7 @@ def _extract_title_phrase(raw_title: str) -> str:
     """Extract the most distinctive phrase from a raw title.
 
     Strips leading CID token, "Letter NN", "DL0NN", and surrounding punctuation/spaces.
-    E.g. "WCCU Letter 14"
+    E.g. "WCCU Letter 14 - Monthly Update Notice"
          → "Monthly Update Notice"
     """
     s = raw_title

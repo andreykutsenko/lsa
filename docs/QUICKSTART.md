@@ -8,7 +8,7 @@ them into an AI-ready prompt — so you can ask Claude or Cursor to explain the 
 ## Prerequisites
 
 - **VPN must be active** — all scripts connect to the RHS server over the corporate network
-- **SSH private key** — get `id_rsa` from your team lead and save it (e.g. `~/id_rsa`)
+- **SSH private key** — your SSH private key for the build server (e.g. `~/.ssh/id_rsa`)
 - **Terminal:**
   - Linux / macOS — regular terminal
   - Windows — open **WSL** and run everything inside it
@@ -23,7 +23,7 @@ cd lsa
 ./scripts/setup.sh
 ```
 
-When prompted: press **Enter** for the default server host/user, then enter the path to your SSH key.
+When prompted: enter the server host/user (ask your team lead), then the path to your SSH key.
 
 Setup installs all dependencies and writes your config to `~/.lsa/config.yaml`.
 

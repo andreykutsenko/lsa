@@ -30,6 +30,9 @@ MAX_TOTAL_DIFF_BYTES = 200_000
 MAX_FILE_DIFF_BYTES = 60_000
 
 # Remote lookup configuration (matches lookup_pr_is.bat). Override per site.
+# Placeholder defaults — override per environment via the `changedocs:` mapping
+# in ~/.lsa/config.yaml (keys: ssh_alias, csv, script, dest_base, paths_json,
+# username). See lsa.web.server._changedocs_remote_overlay.
 REMOTE = {
     "ssh_alias": "rhs",
     "csv": "/path/to/pr_lookup.csv",

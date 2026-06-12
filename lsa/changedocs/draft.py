@@ -40,7 +40,7 @@ SYSTEM_PROMPT_PATH = os.path.join(_HERE, "prompts", "system_cab.md")
 # system prompt) so prompt caching keeps working across detail levels.
 CONCISE_STYLE_DIRECTIVE = (
     "STYLE OVERRIDE — CONCISE: Make every answer as short as possible — one short "
-    "sentence, or a stock answer (\"No.\", \"Manual.\", \"N/A — no the protected platform exposure.\") "
+    "sentence, or a stock answer (\"No.\", \"Manual.\", \"N/A — out of scope.\") "
     "where it suffices. Still name the changed file(s) and the exact mechanism, but omit "
     "elaboration, secondary detail, and restated context. Brevity over completeness."
 )
@@ -72,9 +72,22 @@ class DraftError(Exception):
     """Raised when the CAB draft cannot be produced."""
 
 
+DEFAULT_PLATFORM_NAME = "the protected platform"
+
+
+def _platform_name():
+    """Isolation-target name for CAB questions, from ~/.lsa/config.yaml."""
+    try:
+        from lsa.config import load_user_config
+        cd = load_user_config().get("changedocs") or {}
+        return cd.get("platform") or DEFAULT_PLATFORM_NAME
+    except Exception:
+        return DEFAULT_PLATFORM_NAME
+
+
 def _load_system_prompt():
     with open(SYSTEM_PROMPT_PATH, "r", encoding="utf-8") as fh:
-        return fh.read()
+        return fh.read().replace("{{PLATFORM}}", _platform_name())
 
 
 def estimate_tokens(text):

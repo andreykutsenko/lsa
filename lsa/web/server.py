@@ -1579,17 +1579,20 @@ async def changedocs_generate(req: ChangeDocsGenerateRequest):
     produced.append({"kind": "cab", "name": cab_name, "download": _download_ref(cab_name),
                      "path": str(out_dir / cab_name)})
 
+    programmer = (cfg.get("changedocs") or {}).get("programmer", "")
+
     if req.ptf:
         ptf_name = f"{ticket_id}_PTF.docx"
         renderer.render_ptf(context, str(out_dir / ptf_name), jira=req.jira,
-                            hours=req.hours, live_date=req.live_date)
+                            hours=req.hours, live_date=req.live_date,
+                            programmer=programmer)
         produced.append({"kind": "ptf", "name": ptf_name, "download": _download_ref(ptf_name),
                          "path": str(out_dir / ptf_name)})
 
     if req.qa:
         qa_name = f"{ticket_id}_QA_Checklist.docx"
         renderer.render_qa(context, str(out_dir / qa_name), job_number=req.qa_job or "",
-                           l_items=req.qa_items or None)
+                           l_items=req.qa_items or None, programmer=programmer)
         produced.append({"kind": "qa", "name": qa_name, "download": _download_ref(qa_name),
                          "path": str(out_dir / qa_name)})
 

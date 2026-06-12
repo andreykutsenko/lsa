@@ -73,20 +73,20 @@ info "LSA synced."
 section "--- Step 2: RHS server SSH key auth ---"
 echo "LSA connects to the RHS server to create snapshots."
 echo
-echo "  Default server: linux-server.example.com"
-echo "  Default user:   svcuser"
-echo
-echo "  Press Enter to use defaults, or type a new value to override."
+echo "  Ask your team lead for the server hostname and SSH username."
 echo
 
-default_rhs_host="linux-server.example.com"
-default_rhs_user="svcuser"
+read -rp "RHS hostname: " rhs_host
+while [[ -z "$rhs_host" ]]; do
+  warn "Hostname cannot be empty."
+  read -rp "RHS hostname: " rhs_host
+done
 
-read -rp "RHS hostname [${default_rhs_host}]: " rhs_host
-rhs_host="${rhs_host:-$default_rhs_host}"
-
-read -rp "SSH username [${default_rhs_user}]: " rhs_user
-rhs_user="${rhs_user:-$default_rhs_user}"
+read -rp "SSH username: " rhs_user
+while [[ -z "$rhs_user" ]]; do
+  warn "Username cannot be empty."
+  read -rp "SSH username: " rhs_user
+done
 
 read -rp "Path to SSH private key (e.g. ~/.ssh/id_rsa): " key_path
 while [[ -z "$key_path" ]]; do
