@@ -47,6 +47,7 @@ LSA automates this preprocessing step:
 ```
 
 For detailed technical architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+For current status, closed tasks, and the roadmap, see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
 ## Repository Layout
 
@@ -56,11 +57,15 @@ lsa_project/                     # This repo (Git tracked)
 │   ├── cli.py              # Typer CLI entrypoint
 │   ├── db/schema.py        # SQLite tables
 │   ├── rules/external_signals.yaml  # Detection rules
+│   ├── changedocs/         # CAB/PTF/QA generator (web Change Docs tab)
+│   ├── web/                # Operator console (FastAPI + vanilla JS)
 │   └── ...
 ├── tests/
 ├── pyproject.toml
 ├── docs/
-│   └── ARCHITECTURE.md         # Technical deep-dive
+│   ├── ARCHITECTURE.md         # Technical deep-dive
+│   └── PROJECT_STATUS.md       # Status, closed tasks, roadmap
+├── .agent/tasks/                # Frozen specs + evidence per completed task
 └── README.md
 
 snapshot_project/                # NOT in Git (see .gitignore)
@@ -131,6 +136,24 @@ Search is operator-oriented:
 
 Imported Papyrus/PDF message codes are searchable from the same UI alongside file results.
 
+### Change Docs (CAB / PTF / QA)
+
+The **Change Docs** tab generates change-control documents from a parallel-run
+diff fetched over ssh by PRID:
+
+- **CAB Questionnaire** — drafted by the Claude API (single bounded call;
+  a dry-run **Preview** shows context size and worst-case cost before any call)
+- **PTF** and **QA Checklist** — rendered deterministically from bundled
+  `.docx` templates, no API involved
+
+Requires an Anthropic API key: paste it once in the UI (stored in
+`~/.lsa/anthropic_key`, chmod 600) or set `ANTHROPIC_API_KEY`. Only
+whitelisted code-extension diffs are sent; client data never leaves the box.
+
+The console binds to localhost; state-changing requests from foreign web
+origins are rejected, and all file access is confined to the configured
+snapshot/output roots.
+
 If you already know the snapshot path, `lsa serve "$SNAP"` still works, but `lsa serve` is the primary operator flow.
 
 ## Snapshot Workflow
@@ -158,7 +181,7 @@ lsa scan "$SNAP"
 
 # 2. Import knowledge base (message codes from PDF)
 lsa import-codes "$SNAP"
-# Auto-detects: <SNAP>/refs/papyrus/*.pdf or global default
+# Auto-detects: <SNAP>/refs/papyrus/*.pdf or codes_pdf from ~/.lsa/config.yaml
 
 # 3. Import debugging histories (past cases)
 lsa import-histories "$SNAP"
@@ -375,4 +398,4 @@ Internal use only. Not for distribution.
 
 ---
 
-*LSA v0.3.0 — Legacy Script Archaeologist*
+*LSA v0.4.0 — Legacy Script Archaeologist*

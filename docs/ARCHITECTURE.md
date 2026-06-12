@@ -290,6 +290,10 @@ Optional browser-based frontend as alternative to CLI. Requires `pip install 'ls
 | `/api/file` | GET | Read file from snapshot |
 | `/api/search` | GET | FTS5 + LIKE fallback search |
 | `/api/stats` | GET | Snapshot statistics |
+| `/api/changedocs/key` | GET/POST/DELETE | Manage stored Anthropic API key |
+| `/api/changedocs/preview` | POST | Dry-run: ssh context + cost estimate, no API call |
+| `/api/changedocs/generate` | POST | Draft CAB via Claude API, render PTF/QA `.docx` |
+| `/api/changedocs/download` | GET | Download a generated `.docx` (confined to output root) |
 
 **Snapshot creation replicates `lsa-snap.sh`:**
 1. `rsync` 5 directories from RHS (master, procs, control, insert, docdef)
@@ -303,7 +307,21 @@ Optional browser-based frontend as alternative to CLI. Requires `pip install 'ls
 3. Generate `pull_from_rhs.sh` script
 4. Generate notes and plan JSON
 
-```
+**Change Docs pipeline (`lsa/changedocs/`):**
+1. `context.py` — fetch parallel-run diff over ssh by PRID; whitelist code
+   extensions, cap per-file and total diff size
+2. `draft.py` — single bounded Claude API call (Sonnet default) for CAB
+   prose; one JSON-repair retry; usage logged to `~/.lsa/changedocs/usage.log`
+3. `render.py` / `generate_cab.py` — deterministic `.docx` rendering of CAB,
+   PTF, and QA from bundled templates
+
+**Security model (localhost console):**
+- Path containment via `Path.is_relative_to` on resolved paths (file reads,
+  snapshot delete, doc downloads)
+- User-supplied path components (snapshot name, workspace ticket/title,
+  changedocs ticket_id) sanitized to a safe charset
+- Mutating requests (POST/PUT/PATCH/DELETE) with a non-localhost `Origin`
+  header are rejected — blocks CSRF from other sites open in the browser
 
 ## Database Schema (ER Diagram)
 

@@ -64,6 +64,9 @@ The current V1 web UI is an operator console:
 - one action row drives the core flow: open files, create workspace, copy file list, generate prompt, open diagram
 - search distinguishes `Files` vs `Knowledge` vs `All`, with `Path`/`Content` and `Current scope`/`Whole snapshot`
 - Papyrus/PDF message codes are searchable from the same UI, including mixed `All` searches
+- **Change Docs** tab generates CAB / PTF / QA change-control documents from a
+  parallel-run diff: CAB is drafted by the Claude API (with a no-cost dry-run
+  preview), PTF and QA are filled deterministically from `.docx` templates
 
 ## What You Get
 

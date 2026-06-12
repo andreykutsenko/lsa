@@ -1,6 +1,6 @@
 # LSA Project Status
 
-**Last Updated:** 2026-03-25
+**Last Updated:** 2026-06-11
 
 Use this file to restore context when starting a new Claude Code session.
 
@@ -16,7 +16,72 @@ LSA (Legacy Script Archaeologist) is a CLI tool for analyzing Papyrus/DocExec ba
 
 ---
 
-## Done (v0.4.0)
+## Done (v0.4.0 — 2026-06-11 session)
+
+All tasks below went through the repo-task-proof-loop workflow: frozen spec,
+implementation, evidence, and an independent fresh-session verification.
+Artifacts live in `.agent/tasks/<task>/` (spec.md, evidence.md, verdict.json).
+
+### Change Docs generator (`lsa/changedocs/`, task: changedocs-web)
+- [x] CAB Questionnaire drafted via a single bounded Claude API call
+      (Sonnet default, Opus optional; concise/detailed styles; one
+      JSON-repair retry; prompt caching for the system prompt)
+- [x] PTF and QA Checklist rendered deterministically from bundled
+      `.docx` templates (no API)
+- [x] Context fetched over ssh by PRID; only whitelisted code-extension
+      diffs, per-file and total size caps
+- [x] Dry-run Preview: token estimate + worst-case cost, zero API calls
+- [x] Web UI tab: PRID input, model/detail selectors, API key management
+      (`~/.lsa/anthropic_key`, chmod 600, env fallback), PTF/QA toggles,
+      extra-context with load-from-file, `.docx` downloads
+- [x] Token usage logged to `~/.lsa/changedocs/usage.log` (accumulated
+      across retries, logged even on failure)
+
+### Security & correctness fixes (task: critical-fixes-v1)
+- [x] Path containment via `Path.is_relative_to` (string-prefix bypass via
+      sibling dirs closed); deleting snaproot itself rejected
+- [x] User-supplied path components sanitized (snapshot name, workspace
+      ticket/title, changedocs ticket_id)
+- [x] changedocs prompts/templates included in the wheel build
+- [x] Hardcoded personal PDF path removed; `codes_pdf` read from
+      `~/.lsa/config.yaml`
+
+### Robustness fixes (task: medium-fixes-v1)
+- [x] changedocs errors surface as HTTP 400 (ssh timeout → ContextError,
+      anthropic.APIError / double-malformed JSON → DraftError)
+- [x] Snapshot-create SSE stream survives rsync timeouts (done event
+      always arrives)
+- [x] Cross-origin POST/PUT/PATCH/DELETE rejected unless Origin is
+      localhost (CSRF guard)
+- [x] SQLite: get_connection commits on success / rolls back on error;
+      scan, graph build, and import-codes batch writes (one commit per
+      loop instead of one per row)
+- [x] FTS search failures print a warning instead of silent "no results"
+- [x] Redactor preserves date/timestamp tokens (YYYYMMDD[HHMMSS]) instead
+      of mangling them into [ACCT]
+- [x] Plan handlers take a local snapshot of shared plan state
+
+### Web UX fixes (task: ux-fixes-v1)
+- [x] Amber progress bar + warn callout when rsync/scan/copy errors occur
+- [x] Search filter changes re-run the query immediately
+- [x] Form inputs survive navigation and re-renders (Scope Builder,
+      Change Docs, Prompt textarea)
+- [x] Client-side PRID validation with inline field error
+- [x] "Copy raw" button in file preview modal (strips line numbers)
+- [x] Merged Captured/Freshness into one column (absolute date in tooltip)
+- [x] Busy state on snapshot "Use" button
+- [x] escapeHtml escapes quotes (attribute-injection hardening)
+- [x] Search Preview button maps to the correct result across
+      Knowledge/Files sections
+
+### Test suite
+- [x] 200 tests passing (was 177 before this session); new coverage:
+      changedocs engine/routes, path safety, origin guard, SSE resilience,
+      DB transactions, redactor, FTS error reporting
+
+---
+
+## Done (earlier sessions)
 
 ### Core Commands
 - [x] `lsa scan` — index snapshot, build execution graph from .procs
@@ -181,6 +246,28 @@ uv run lsa explain "$SNAP" "$LOG" --prompt --lang ru
 
 ## Planned (Next Session)
 
+### From the 2026-06-11 review (graded backlog)
+
+Functional improvements grounded in the current code (see review findings in
+`.agent/tasks/*/spec.md` for context):
+
+- [ ] **Richer graph edges (HIGH)** — `.procs` parsing already extracts
+      `print_files`, `file_setup`, `all_paths`, but only `shell_script`
+      becomes a RUNS edge. Adding USES/READS edges would improve
+      `lsa plan` bundle discovery.
+- [ ] **Similarity normalization (MEDIUM)** — group signal codes by family
+      (`ORA-*`, `PPCS*`), wildcard numeric parts; unify the metric
+      (`find_similar_cases` uses max-denominator, `compute_signal_similarity`
+      uses Jaccard — they disagree today).
+- [ ] **`lsa scan --clean` (MEDIUM)** — procs deleted from the snapshot
+      currently stay in the graph forever; add a drop-and-rebuild flag.
+- [ ] **FTS over procs parsed_json (LOW)** — planner keyword fallback scans
+      all procs in Python (O(N) per query).
+- [ ] **Cache `rglob` lookups in paths.py (LOW)** — unmapped-path resolution
+      rescans the snapshot directory per path per proc during scan.
+- [ ] **Web: persist plan state per session (LOW)** — current scope is
+      lost on server restart/page reload (known V1 limitation).
+
 ### `lsa cases` Command (HIGH PRIORITY)
 Search through past debugging cases proactively:
 ```bash
@@ -258,6 +345,11 @@ Strengthen case_cards as a solutions knowledge base:
 | Web UI frontend | `lsa/web/static/` (app.js, style.css, index.html) |
 | Web UI launcher | `lsa/web/launcher.py` |
 | User config loader | `lsa/config.py` → `load_user_config()` |
+| Change Docs: ssh context | `lsa/changedocs/context.py` |
+| Change Docs: LLM draft | `lsa/changedocs/draft.py` |
+| Change Docs: .docx render | `lsa/changedocs/render.py`, `generate_cab.py` |
+| Change Docs: templates/prompt | `lsa/changedocs/templates/`, `prompts/system_cab.md` |
+| Task artifacts (proof loop) | `.agent/tasks/<task>/` (spec, evidence, verdict) |
 
 ---
 
@@ -285,9 +377,25 @@ lsa serve $SNAP                                                    # 7. web UI (
 
 ---
 
+## Development Workflow
+
+Substantial features/refactors/bug fixes go through the **repo-task-proof-loop**
+(see `CLAUDE.md` / `AGENTS.md`):
+
+1. Freeze `.agent/tasks/<TASK_ID>/spec.md` with acceptance criteria (AC1, AC2, ...)
+2. Implement against the frozen criteria
+3. Produce `evidence.md` / `evidence.json` + raw command outputs
+4. Independent fresh-session verification writes `verdict.json`
+   (and `problems.md` on FAIL → smallest safe fix → reverify)
+
+Config lives in `~/.lsa/config.yaml`: `snaproot`, `workroot`, `rhs_host`,
+`rhs_user`, optional `codes_pdf`, plus changedocs remote overrides.
+
+---
+
 ## How to Continue
 
 1. Read this file to restore context
-2. Check "In Progress" section for pending work
-3. Check "Planned" for next features
-4. Run tests: `uv run pytest`
+2. Check "Planned" for next features (review backlog is graded by priority)
+3. Run tests: `uv run pytest` (expect 200 passing)
+4. Task history with specs/evidence: `.agent/tasks/`

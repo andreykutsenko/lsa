@@ -106,6 +106,11 @@ Prompt generation in the web UI supports two scenarios:
 - `Incident analysis`
 - `Change request analysis`
 
+The **Change Docs** tab turns a parallel-run PRID into ready CAB / PTF / QA
+documents (`.docx`). Paste an Anthropic API key once (or set
+`ANTHROPIC_API_KEY`); use **Preview** first — it shows the estimated cost
+without making any API call.
+
 > On WSL, created snapshots and workspaces show a clickable Windows Explorer path.
 >
 > After restarting `lsa serve` or reloading the page, reselect the snapshot and run `Find scope` again. Current scope is not persisted across restarts in V1.
