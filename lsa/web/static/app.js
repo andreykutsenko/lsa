@@ -19,6 +19,20 @@ const state = {
   searchSpace: 'all',
   openWorkspaceComposer: false,
   bundleFocus: null,
+  bundleForm: { title: '', cid: '', jobid: '', limit: 5 },
+  promptInput: '',
+  changeDocs: {
+    model: 'sonnet',
+    detail: 'concise',
+    extraContext: '',
+    apiKey: '',
+    keyStatus: null,
+    keyEditing: false,
+    ptf: false,
+    qa: false,
+    preview: null,
+    result: null,
+  },
 };
 
 mermaid.initialize({
@@ -51,7 +65,7 @@ async function api(method, path, body) {
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str ?? '';
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 let toastTimer = null;
@@ -72,9 +86,12 @@ async function copyToClipboard(text) {
   }
 }
 
-function showModal(title, content) {
+function showModal(title, content, copyText = null) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').textContent = content;
+  const copyBtn = document.getElementById('modal-copy');
+  copyBtn.hidden = copyText === null;
+  copyBtn.onclick = copyText === null ? null : () => copyToClipboard(copyText);
   document.getElementById('modal').hidden = false;
 }
 
@@ -328,9 +345,9 @@ async function openCurrentDiagram() {
 
 async function previewFile(path) {
   const data = await api('GET', `/api/file?path=${encodeURIComponent(path)}`);
-  const lines = (data.content ?? '').split('\n');
-  const numbered = lines.map((line, i) => `${String(i + 1).padStart(4)} | ${line}`).join('\n');
-  showModal(data.path ?? path, numbered);
+  const raw = data.content ?? '';
+  const numbered = raw.split('\n').map((line, i) => `${String(i + 1).padStart(4)} | ${line}`).join('\n');
+  showModal(data.path ?? path, numbered, raw);
 }
 
 function renderIntentSummary(intent) {
@@ -380,6 +397,7 @@ function render() {
     case 'snapshot': renderSnapshotStep(el); break;
     case 'bundle': renderBundleStep(el); break;
     case 'prompt': renderPromptStep(el); break;
+    case 'changedocs': renderChangeDocsStep(el); break;
     case 'stats': renderStatsPage(el); break;
     case 'search': renderSearchPage(el); break;
     default: renderSnapshotStep(el); break;
@@ -559,14 +577,16 @@ function toggleNewSnapForm() {
 
       if (finalResult) {
         const optional = (finalResult.optional_copy_results ?? []).filter(item => item.ok).map(item => item.label);
+        const hasErrors = Boolean(finalResult.rsync_errors?.length) || !finalResult.scan_ok;
         let msg = `Snapshot "${escapeHtml(finalResult.name)}" created.`;
         msg += finalResult.scan_ok ? ' Indexed successfully.' : ` Indexing failed: ${escapeHtml(finalResult.scan_error ?? 'unknown')}`;
-        if (finalResult.rsync_errors?.length) msg += ` ${finalResult.rsync_errors.length} remote sync error(s).`;
+        if (finalResult.rsync_errors?.length) msg += ` ${Number(finalResult.rsync_errors.length)} remote sync error(s).`;
         if (optional.length) msg += ` Optional sources: ${escapeHtml(optional.join(', '))}.`;
         if (finalResult.path_win) {
           msg += `<br><a href="#" class="ws-open-link" data-winpath>Explorer: ${escapeHtml(finalResult.path_win)}</a>`;
         }
-        status.innerHTML = `<div class="callout callout--info">${msg}</div>`;
+        document.getElementById('ns-progress-fill')?.classList.toggle('progress-fill--warn', hasErrors);
+        status.innerHTML = `<div class="callout ${hasErrors ? 'callout--warn' : 'callout--info'}">${msg}</div>`;
         if (finalResult.path_win) {
           status.querySelector('[data-winpath]').addEventListener('click', e => {
             e.preventDefault();
@@ -617,7 +637,6 @@ async function loadSnapList() {
     <div class="ops-table">
       <div class="ops-table__head ops-table__head--snapshots">
         <span>Snapshot</span>
-        <span>Captured</span>
         <span>Ready</span>
         <span>Freshness</span>
         <span>Contents summary</span>
@@ -632,9 +651,8 @@ async function loadSnapList() {
               <div class="ops-title">${escapeHtml(snap.name)}</div>
               <div class="ops-sub">${escapeHtml(snap.path)}</div>
             </div>
-            <div class="ops-cell">${escapeHtml(snap.date ?? 'unknown')}</div>
             <div class="ops-cell"><span class="status-dot ${snap.has_db ? 'is-ready' : 'is-warn'}"></span>${snap.has_db ? 'Ready' : 'Needs scan'}</div>
-            <div class="ops-cell">${escapeHtml(formatRelativeTime(snap.date))}</div>
+            <div class="ops-cell" title="Captured: ${escapeHtml(snap.date ?? 'unknown')}">${escapeHtml(formatRelativeTime(snap.date))}</div>
             <div class="ops-cell">${renderSnapshotSummary(snap.stats)}</div>
             <div class="ops-cell">${snap.stats?.incidents ?? '-'}</div>
             <div class="ops-cell ops-cell--actions">
@@ -656,7 +674,11 @@ function bindSnapEvents() {
         toast('Snapshot needs indexing first');
         return;
       }
+      const row = button.closest('.ops-table__row');
+      const originalLabel = button.textContent;
       button.disabled = true;
+      button.textContent = 'Using…';
+      row?.classList.add('is-busy');
       try {
         await api('POST', `/api/snapshot/select?path=${encodeURIComponent(snap.path)}`);
         state.snapshot = snap;
@@ -674,6 +696,8 @@ function bindSnapEvents() {
         toast(err.message);
       } finally {
         button.disabled = false;
+        button.textContent = originalLabel;
+        row?.classList.remove('is-busy');
       }
     });
   });
@@ -699,6 +723,7 @@ function showDeleteConfirm(snap) {
       <button class="btn" id="btn-cancel-delete">Cancel</button>
     </div>
     <div id="delete-status"></div>`;
+  document.getElementById('modal-copy').hidden = true;
   modal.hidden = false;
   document.getElementById('btn-cancel-delete').addEventListener('click', hideModal);
   document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
@@ -734,10 +759,10 @@ function renderBundleStep(el) {
     <section class="section">
       <div class="surface surface--raised">
         <div class="section-title">Find scope</div>
-        <div class="field"><label>Title</label><input id="f-title" placeholder="Incident title or change request"></div>
-        <div class="field"><label>CID</label><input id="f-cid" placeholder="Case ID"></div>
-        <div class="field"><label>Job ID</label><input id="f-jobid" placeholder="Job name or ID"></div>
-        <div class="field"><label>Candidate limit</label><input id="f-limit" type="number" value="5" min="1" max="20"></div>
+        <div class="field"><label>Title</label><input id="f-title" placeholder="Incident title or change request" value="${escapeHtml(state.bundleForm.title)}"></div>
+        <div class="field"><label>CID</label><input id="f-cid" placeholder="Case ID" value="${escapeHtml(state.bundleForm.cid)}"></div>
+        <div class="field"><label>Job ID</label><input id="f-jobid" placeholder="Job name or ID" value="${escapeHtml(state.bundleForm.jobid)}"></div>
+        <div class="field"><label>Candidate limit</label><input id="f-limit" type="number" value="${Number(state.bundleForm.limit) || 5}" min="1" max="20"></div>
         <div class="btn-row">
           <button class="btn btn--primary" id="btn-plan">Find scope</button>
         </div>
@@ -747,6 +772,15 @@ function renderBundleStep(el) {
     <div id="plan-results"></div>`;
 
   if (state.plan) renderPlanResults();
+
+  [['f-title', 'title'], ['f-cid', 'cid'], ['f-jobid', 'jobid']].forEach(([id, key]) => {
+    document.getElementById(id).addEventListener('input', e => {
+      state.bundleForm[key] = e.target.value;
+    });
+  });
+  document.getElementById('f-limit').addEventListener('input', e => {
+    state.bundleForm.limit = Number(e.target.value) || 5;
+  });
 
   document.getElementById('btn-plan').addEventListener('click', async () => {
     const body = { limit: Number(document.getElementById('f-limit').value) || 5 };
@@ -852,13 +886,16 @@ function renderWorkspaceComposer(target) {
         }
       }
       if (finalResult) {
+        const copyErrors = finalResult.copy_errors?.length ?? 0;
         let msg = `Workspace created: <code>${escapeHtml(finalResult.workspace)}</code>`;
         if (finalResult.workspace_win) {
           msg += `<br><a href="#" class="ws-open-link" data-winpath>Open in Explorer</a>`;
         }
-        msg += `<br>${finalResult.files_copied} file(s) copied.`;
+        msg += `<br>${Number(finalResult.files_copied) || 0} file(s) copied.`;
+        if (copyErrors) msg += ` ${Number(copyErrors)} copy error(s) — see pull script for retry.`;
         msg += `<br>Pull script: <code>${escapeHtml(finalResult.pull_script)}</code>`;
-        status.innerHTML = `<div class="callout callout--info">${msg}</div>`;
+        document.getElementById('ws-progress-fill')?.classList.toggle('progress-fill--warn', copyErrors > 0);
+        status.innerHTML = `<div class="callout ${copyErrors ? 'callout--warn' : 'callout--info'}">${msg}</div>`;
         if (finalResult.workspace_win) {
           status.querySelector('[data-winpath]').addEventListener('click', e => {
             e.preventDefault();
@@ -1145,17 +1182,22 @@ function renderSearchPage(el) {
       performSearch(input.value.trim());
     }
   });
+  const rerunSearch = () => {
+    const query = input.value.trim();
+    if (query) performSearch(query);
+  };
   document.getElementById('search-mode').addEventListener('change', e => {
-    if (e.target.name === 'search-mode') state.searchMode = e.target.value;
+    if (e.target.name === 'search-mode') { state.searchMode = e.target.value; rerunSearch(); }
   });
   document.getElementById('search-scope').addEventListener('change', e => {
-    if (e.target.name === 'search-scope') state.searchScope = e.target.value;
+    if (e.target.name === 'search-scope') { state.searchScope = e.target.value; rerunSearch(); }
   });
   document.getElementById('search-kind').addEventListener('change', e => {
     state.searchKind = e.target.value;
+    rerunSearch();
   });
   document.getElementById('search-space').addEventListener('change', e => {
-    if (e.target.name === 'search-space') state.searchSpace = e.target.value;
+    if (e.target.name === 'search-space') { state.searchSpace = e.target.value; rerunSearch(); }
   });
 }
 
@@ -1190,14 +1232,14 @@ async function performSearch(query) {
     }
     const knowledgeHits = data.filter(hit => hit.match_type === 'knowledge');
     const fileHits = data.filter(hit => hit.match_type !== 'knowledge');
-    const renderHit = (hit, idx) => `
+    const renderHit = hit => `
       <div class="search-hit">
         <div class="search-hit-path">${escapeHtml(hit.path)}</div>
         <div><span class="file-kind">${escapeHtml(kindLabel(hit.kind))}</span></div>
         <div class="search-hit-match">${escapeHtml(hit.match_type ?? state.searchMode)}</div>
         <div class="search-hit-snippet">${hit.snippet ? highlightSnippet(hit.snippet, query) : '<span class="muted">No snippet</span>'}</div>
         <div class="ops-actions">
-          <button class="btn btn--sm" data-search-action="preview" data-idx="${idx}">Preview</button>
+          <button class="btn btn--sm" data-search-action="preview" data-idx="${data.indexOf(hit)}">Preview</button>
           <button class="btn btn--sm" data-search-action="copy" data-path="${escapeHtml(hit.path)}">Copy path</button>
           <button class="btn btn--sm" data-search-action="scope" data-path="${escapeHtml(hit.path)}" ${hasCurrentScope() && hit.match_type !== 'knowledge' ? '' : 'disabled'}>Open in scope</button>
         </div>
@@ -1276,7 +1318,7 @@ function renderPromptPageBody() {
         </div>
         <div class="field">
           <label>${renderPromptInputLabel()}</label>
-          <textarea id="prompt-input" placeholder="${state.promptScenario === 'incident' ? 'Paste error text, log excerpt, or ticket details...' : 'Describe the requested change, constraints, and expected outcome...'}"></textarea>
+          <textarea id="prompt-input" placeholder="${state.promptScenario === 'incident' ? 'Paste error text, log excerpt, or ticket details...' : 'Describe the requested change, constraints, and expected outcome...'}">${escapeHtml(state.promptInput)}</textarea>
         </div>
         <div class="layout-grid layout-grid--split">
           <div class="field">
@@ -1309,6 +1351,9 @@ function renderPromptStep(el) {
   bindScopeActions(el);
   if (!getSelectedCandidate()) return;
 
+  document.getElementById('prompt-input').addEventListener('input', e => {
+    state.promptInput = e.target.value;
+  });
   document.getElementById('prompt-scenario').addEventListener('change', e => {
     if (e.target.name === 'prompt-scenario') {
       state.promptScenario = e.target.value;
@@ -1371,6 +1416,338 @@ function bindPromptOutputEvents() {
   document.querySelector('[data-action="save-prompt-again"]')?.addEventListener('click', () => {
     requestPrompt({ savePrompt: true });
   });
+}
+
+function renderChangeDocsStep(el) {
+  const cd = state.changeDocs;
+  el.innerHTML = `
+    ${renderPageHeader('Change Docs', 'Generate CAB / PTF / QA documents from a parallel-run diff over ssh.', 'CAB drafted via Claude API')}
+    <section class="section">
+      <div class="surface surface--raised">
+        <div class="section-title">Source</div>
+        <div class="layout-grid layout-grid--split">
+          <div class="field">
+            <label>Parallel ID (PRID)</label>
+            <input type="text" id="cd-prid" placeholder="14+ digit parallel id" value="${escapeHtml(cd.prid ?? '')}">
+            <div class="field-error" id="cd-prid-error" hidden></div>
+          </div>
+          <div class="field">
+            <label>Model</label>
+            <select id="cd-model">
+              <option value="sonnet" ${cd.model === 'sonnet' ? 'selected' : ''}>Sonnet (default)</option>
+              <option value="opus" ${cd.model === 'opus' ? 'selected' : ''}>Opus</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Detail</label>
+            <select id="cd-detail">
+              <option value="concise" ${cd.detail === 'concise' ? 'selected' : ''}>Concise (default)</option>
+              <option value="detailed" ${cd.detail === 'detailed' ? 'selected' : ''}>Detailed</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" id="cd-key-block">${renderChangeDocsKeyBlock(cd)}</div>
+        <div class="field">
+          <label>Documents</label>
+          <label class="checkbox-row"><input type="checkbox" checked disabled><span>CAB Questionnaire (always generated, uses Claude API)</span></label>
+          <label class="checkbox-row"><input type="checkbox" id="cd-ptf" ${cd.ptf ? 'checked' : ''}><span>PTF (deterministic, no API)</span></label>
+          <label class="checkbox-row"><input type="checkbox" id="cd-qa" ${cd.qa ? 'checked' : ''}><span>QA Checklist (deterministic, no API)</span></label>
+        </div>
+        <div id="cd-ptf-fields" ${cd.ptf ? '' : 'hidden'}>
+          <div class="layout-grid layout-grid--split">
+            <div class="field">
+              <label>PTF — JIRA #</label>
+              <input type="text" id="cd-jira" value="${escapeHtml(cd.jira ?? '')}">
+            </div>
+            <div class="field">
+              <label>PTF — Hours</label>
+              <input type="text" id="cd-hours" value="${escapeHtml(cd.hours ?? '')}">
+            </div>
+          </div>
+          <div class="field">
+            <label>PTF — Live date (mm/dd/yyyy)</label>
+            <input type="text" id="cd-live-date" value="${escapeHtml(cd.liveDate ?? '')}">
+          </div>
+        </div>
+        <div id="cd-qa-fields" ${cd.qa ? '' : 'hidden'}>
+          <div class="field">
+            <label>QA — Job number (optional)</label>
+            <input type="text" id="cd-qa-job" value="${escapeHtml(cd.qaJob ?? '')}">
+          </div>
+          <div class="field">
+            <label>QA — Items (one per line, optional)</label>
+            <textarea id="cd-qa-items" placeholder="One L test-case item per line">${escapeHtml(cd.qaItems ?? '')}</textarea>
+          </div>
+        </div>
+        <div class="field">
+          <label>Additional context (optional)</label>
+          <textarea id="cd-extra" placeholder="Notes that help draft a better CAB — type, paste, or load from a file. Used as ground truth alongside the diff.">${escapeHtml(cd.extraContext ?? '')}</textarea>
+          <div class="btn-row">
+            <label class="btn btn--sm" for="cd-extra-file">Load from file…</label>
+            <input type="file" id="cd-extra-file" accept=".txt,.md,.log,.diff,.json,.csv" hidden>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="cd-preview">Preview (no API call)</button>
+          <button class="btn btn--primary" id="cd-generate">Generate</button>
+        </div>
+        <div class="help-line">Only whitelisted code-extension diffs are read into memory and sent. Client data is never transmitted.</div>
+      </div>
+    </section>
+    <div id="cd-preview-out">${cd.preview ? renderChangeDocsPreview(cd.preview) : ''}</div>
+    <div id="cd-result-out">${cd.result ? renderChangeDocsResult(cd.result) : ''}</div>`;
+
+  document.getElementById('cd-ptf').addEventListener('change', e => {
+    cd.ptf = e.target.checked;
+    document.getElementById('cd-ptf-fields').hidden = !cd.ptf;
+  });
+  document.getElementById('cd-qa').addEventListener('change', e => {
+    cd.qa = e.target.checked;
+    document.getElementById('cd-qa-fields').hidden = !cd.qa;
+  });
+  document.getElementById('cd-model').addEventListener('change', e => {
+    cd.model = e.target.value;
+  });
+  document.getElementById('cd-detail').addEventListener('change', e => {
+    cd.detail = e.target.value;
+  });
+  document.getElementById('cd-extra-file').addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const ta = document.getElementById('cd-extra');
+      ta.value = ta.value ? `${ta.value}\n${text}` : text;
+      cd.extraContext = ta.value;
+      toast(`Loaded ${file.name}`);
+    } catch (err) {
+      toast(`Could not read file: ${err.message}`);
+    }
+    e.target.value = '';
+  });
+  [
+    ['cd-prid', 'prid'], ['cd-jira', 'jira'], ['cd-hours', 'hours'],
+    ['cd-live-date', 'liveDate'], ['cd-qa-job', 'qaJob'],
+    ['cd-qa-items', 'qaItems'], ['cd-extra', 'extraContext'],
+  ].forEach(([id, key]) => {
+    document.getElementById(id)?.addEventListener('input', e => {
+      cd[key] = e.target.value;
+      if (id === 'cd-prid') {
+        const errEl = document.getElementById('cd-prid-error');
+        if (errEl) errEl.hidden = true;
+      }
+    });
+  });
+  document.getElementById('cd-preview').addEventListener('click', () => changeDocsPreview());
+  document.getElementById('cd-generate').addEventListener('click', () => changeDocsGenerate());
+  _wireChangeDocsKeyBlock();
+  loadChangeDocsKeyStatus();
+}
+
+function renderChangeDocsKeyBlock(cd) {
+  const st = cd.keyStatus;
+  if (st === null) {
+    return `<label>Anthropic API key</label><div class="help-line">Checking key status…</div>`;
+  }
+  if (st.configured && !cd.keyEditing) {
+    const srcLabel = st.source === 'env' ? 'from ANTHROPIC_API_KEY (env)' : 'saved on server';
+    const removeBtn = st.source === 'saved'
+      ? `<button class="btn btn--danger btn--sm" id="cd-key-remove">Remove</button>` : '';
+    return `
+      <label>Anthropic API key</label>
+      <div class="key-status"><span class="status-dot is-ready"></span>Key configured · ${escapeHtml(st.masked ?? '')} · ${srcLabel}</div>
+      <div class="btn-row">
+        <button class="btn btn--sm" id="cd-key-change">Change key</button>
+        ${removeBtn}
+      </div>`;
+  }
+  const cancelBtn = st.configured
+    ? `<button class="btn btn--sm" id="cd-key-cancel">Cancel</button>` : '';
+  const prompt = st.configured
+    ? ''
+    : `<div class="key-status"><span class="status-dot is-warn"></span>No API key yet — paste one and save it to start drafting CABs.</div>`;
+  return `
+    <label>Anthropic API key</label>
+    ${prompt}
+    <input type="password" id="cd-api-key" autocomplete="off" placeholder="sk-ant-…">
+    <div class="btn-row">
+      <button class="btn btn--primary btn--sm" id="cd-key-save">Save key</button>
+      ${cancelBtn}
+    </div>
+    <div class="help-line">Stored on the server in ~/.lsa/anthropic_key (chmod 600). Used automatically afterwards — no need to re-enter it.</div>`;
+}
+
+function refreshChangeDocsKeyBlock() {
+  const block = document.getElementById('cd-key-block');
+  if (!block) return;
+  block.innerHTML = renderChangeDocsKeyBlock(state.changeDocs);
+  _wireChangeDocsKeyBlock();
+}
+
+function _wireChangeDocsKeyBlock() {
+  const cd = state.changeDocs;
+  document.getElementById('cd-key-change')?.addEventListener('click', () => {
+    cd.keyEditing = true;
+    refreshChangeDocsKeyBlock();
+  });
+  document.getElementById('cd-key-cancel')?.addEventListener('click', () => {
+    cd.keyEditing = false;
+    refreshChangeDocsKeyBlock();
+  });
+  document.getElementById('cd-key-remove')?.addEventListener('click', () => changeDocsKeyRemove());
+  document.getElementById('cd-key-save')?.addEventListener('click', () => changeDocsKeySave());
+}
+
+async function loadChangeDocsKeyStatus() {
+  const cd = state.changeDocs;
+  try {
+    cd.keyStatus = await api('GET', '/api/changedocs/key');
+  } catch {
+    cd.keyStatus = { configured: false, source: null, masked: null };
+  }
+  refreshChangeDocsKeyBlock();
+}
+
+async function changeDocsKeySave() {
+  const cd = state.changeDocs;
+  const key = document.getElementById('cd-api-key')?.value.trim() ?? '';
+  if (!key) { toast('Paste an API key first'); return; }
+  try {
+    cd.keyStatus = await api('POST', '/api/changedocs/key', { api_key: key });
+    cd.keyEditing = false;
+    refreshChangeDocsKeyBlock();
+    toast('API key saved');
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+async function changeDocsKeyRemove() {
+  const cd = state.changeDocs;
+  try {
+    cd.keyStatus = await api('DELETE', '/api/changedocs/key');
+    cd.keyEditing = false;
+    refreshChangeDocsKeyBlock();
+    toast('API key removed');
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function _readChangeDocsForm() {
+  const cd = state.changeDocs;
+  cd.prid = document.getElementById('cd-prid').value.trim();
+  cd.model = document.getElementById('cd-model').value;
+  cd.detail = document.getElementById('cd-detail').value;
+  cd.extraContext = document.getElementById('cd-extra')?.value ?? '';
+  cd.apiKey = document.getElementById('cd-api-key')?.value.trim() ?? '';
+  cd.ptf = document.getElementById('cd-ptf').checked;
+  cd.qa = document.getElementById('cd-qa').checked;
+  cd.jira = document.getElementById('cd-jira')?.value ?? '';
+  cd.hours = document.getElementById('cd-hours')?.value ?? '';
+  cd.liveDate = document.getElementById('cd-live-date')?.value ?? '';
+  cd.qaJob = document.getElementById('cd-qa-job')?.value ?? '';
+  cd.qaItems = document.getElementById('cd-qa-items')?.value ?? '';
+  return cd;
+}
+
+function _validatePrid(prid) {
+  const errEl = document.getElementById('cd-prid-error');
+  if (/^\d{14,}$/.test(prid)) {
+    if (errEl) errEl.hidden = true;
+    return true;
+  }
+  if (errEl) {
+    errEl.textContent = prid
+      ? 'PRID must be 14+ digits (no letters or separators).'
+      : 'Enter a Parallel ID first.';
+    errEl.hidden = false;
+  }
+  return false;
+}
+
+async function changeDocsPreview() {
+  const cd = _readChangeDocsForm();
+  if (!_validatePrid(cd.prid)) return;
+  const out = document.getElementById('cd-preview-out');
+  setLoading(out, true);
+  try {
+    cd.preview = await api('POST', '/api/changedocs/preview', { prid: cd.prid, model: cd.model, detail: cd.detail, extra_context: cd.extraContext });
+    out.innerHTML = renderChangeDocsPreview(cd.preview);
+  } catch (err) {
+    cd.preview = null;
+    out.innerHTML = `<div class="inline-error">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function changeDocsGenerate() {
+  const cd = _readChangeDocsForm();
+  if (!_validatePrid(cd.prid)) return;
+  const out = document.getElementById('cd-result-out');
+  setLoading(out, true);
+  const qaItems = cd.qaItems
+    ? cd.qaItems.split('\n').map(s => s.trim()).filter(Boolean)
+    : null;
+  try {
+    cd.result = await api('POST', '/api/changedocs/generate', {
+      prid: cd.prid,
+      model: cd.model,
+      detail: cd.detail,
+      extra_context: cd.extraContext,
+      ptf: cd.ptf,
+      qa: cd.qa,
+      jira: cd.jira ?? '',
+      hours: cd.hours ?? '',
+      live_date: cd.liveDate ?? '',
+      qa_job: cd.qaJob || null,
+      qa_items: qaItems,
+      api_key: cd.apiKey || null,
+    });
+    out.innerHTML = renderChangeDocsResult(cd.result);
+  } catch (err) {
+    cd.result = null;
+    out.innerHTML = `<div class="inline-error">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderChangeDocsPreview(preview) {
+  if (preview.no_diffs) {
+    return `<section class="section surface surface--raised">
+      <div class="section-title">Preview — no API call made</div>
+      <div class="help-line">${escapeHtml(preview.message ?? 'No code diffs found.')}</div>
+      ${preview.skipped?.length ? `<div class="help-line">Skipped: ${escapeHtml(preview.skipped.join('; '))}</div>` : ''}
+    </section>`;
+  }
+  const cost = typeof preview.estimated_cost_usd === 'number'
+    ? `$${preview.estimated_cost_usd.toFixed(4)}`
+    : '—';
+  return `
+    <section class="section surface surface--raised">
+      <div class="section-title">Preview — estimate only, no API call made</div>
+      <div class="pill-row">
+        <span class="scope-pill">${escapeHtml(preview.parallel_id ?? '(unknown)')}</span>
+        <span class="scope-pill">${escapeHtml(preview.model_id ?? '')}</span>
+        <span class="scope-pill">${(preview.diffs?.length ?? 0)} diff(s)</span>
+      </div>
+      <div class="help-line">Description: ${escapeHtml(preview.description ?? '(none)')}</div>
+      <div class="help-line">Files: ${escapeHtml((preview.files ?? []).join(', ') || '(none)')}</div>
+      <div class="help-line">Est. input tokens: ${escapeHtml(String(preview.estimated_input_tokens ?? '—'))} · max output tokens: ${escapeHtml(String(preview.max_output_tokens ?? '—'))}</div>
+      <div class="help-line">Estimated cost (worst case): ${escapeHtml(cost)} — estimate only, verify pricing.</div>
+      ${preview.skipped?.length ? `<div class="help-line">Skipped (not sent): ${escapeHtml(preview.skipped.join('; '))}</div>` : ''}
+    </section>`;
+}
+
+function renderChangeDocsResult(result) {
+  const links = (result.files ?? []).map(f =>
+    `<li><a href="${escapeHtml(f.download)}" download>${escapeHtml(f.name)}</a> <span class="scope-pill">${escapeHtml(f.kind)}</span></li>`
+  ).join('');
+  return `
+    <section class="section surface surface--raised">
+      <div class="section-title">Generated documents</div>
+      <div class="help-line">Ticket: ${escapeHtml(result.ticket_id ?? '')} · ${escapeHtml(result.out_dir ?? '')}</div>
+      <ul class="download-list">${links}</ul>
+      ${result.skipped?.length ? `<div class="help-line">Skipped (not sent): ${escapeHtml(result.skipped.join('; '))}</div>` : ''}
+    </section>`;
 }
 
 document.getElementById('modal-close').addEventListener('click', hideModal);

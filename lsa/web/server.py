@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -13,11 +14,38 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI(title="LSA Web UI")
+
+_LOCAL_ORIGIN_HOSTS = {"localhost", "127.0.0.1", "::1"}
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _origin_allowed(origin: str | None) -> bool:
+    """Allow requests without an Origin header (CLI) or from localhost origins."""
+    if not origin:
+        return True
+    from urllib.parse import urlsplit
+    try:
+        host = urlsplit(origin).hostname
+    except ValueError:
+        return False
+    return host in _LOCAL_ORIGIN_HOSTS
+
+
+@app.middleware("http")
+async def _reject_cross_origin_mutations(request, call_next):
+    if request.method in _MUTATING_METHODS:
+        if not _origin_allowed(request.headers.get("origin")):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Cross-origin requests are not allowed"},
+            )
+    return await call_next(request)
 
 # --- App state (set by create_app before uvicorn.run) ---
 
@@ -41,6 +69,17 @@ def _get_snapshot() -> Path:
     if _snapshot_path is None:
         raise HTTPException(400, "No snapshot selected")
     return _snapshot_path
+
+
+_UNSAFE_COMPONENT_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _sanitize_component(value: str) -> str:
+    """Reduce a user-supplied string to a safe single path component."""
+    cleaned = _UNSAFE_COMPONENT_CHARS.sub("_", value).lstrip(".")
+    if not cleaned or not cleaned.strip("._"):
+        raise HTTPException(400, f"Invalid name: {value!r}")
+    return cleaned
 
 
 def _open_connection(snapshot: Path) -> sqlite3.Connection:
@@ -107,6 +146,33 @@ class WorkspaceRequest(BaseModel):
     title: str | None = None
     mode: str = "snap"  # "snap" | "ssh"
     candidate_index: int = 0
+
+
+class ChangeDocsPreviewRequest(BaseModel):
+    prid: str
+    model: str = "sonnet"  # "sonnet" | "opus"
+    detail: str = "concise"  # "concise" | "detailed"
+    extra_context: str = ""
+
+
+class ChangeDocsGenerateRequest(BaseModel):
+    prid: str
+    model: str = "sonnet"  # "sonnet" | "opus"
+    detail: str = "concise"  # "concise" | "detailed"
+    extra_context: str = ""
+    ticket_id: str | None = None
+    ptf: bool = False
+    qa: bool = False
+    jira: str = ""
+    hours: str = ""
+    live_date: str = ""
+    qa_job: str | None = None
+    qa_items: list[str] | None = None
+    api_key: str | None = None
+
+
+class ApiKeyRequest(BaseModel):
+    api_key: str
 
 
 # --- API: Snapshots ---
@@ -230,7 +296,8 @@ async def delete_snapshot(path: str = Query(...)):
     # Safety: only allow deleting from snaproot
     if _snaproot is None:
         raise HTTPException(400, "snaproot not configured")
-    if not str(snap).startswith(str(_snaproot.resolve())):
+    snaproot = _snaproot.resolve()
+    if snap == snaproot or not snap.is_relative_to(snaproot):
         raise HTTPException(403, "Can only delete snapshots within snaproot")
 
     # Don't allow deleting the currently active snapshot
@@ -278,6 +345,10 @@ async def create_snapshot(req: NewSnapshotRequest):
     if not snaproot:
         raise HTTPException(400, "snaproot not configured in ~/.lsa/config.yaml")
 
+    if _sanitize_component(req.name) != req.name:
+        raise HTTPException(
+            400, "Snapshot name may only contain letters, digits, '.', '_' and '-'"
+        )
     snap_dir = Path(snaproot).expanduser() / f"rhs_snapshot_{req.name}"
     if snap_dir.exists():
         raise HTTPException(400, f"Snapshot 'rhs_snapshot_{req.name}' already exists")
@@ -384,9 +455,14 @@ def _snapshot_create_stream(req: NewSnapshotRequest, snap_dir: Path, cfg: dict):
     for dir_name, cmd in rsync_jobs:
         step += 1
         yield _sse_event({"step": step, "total": total_steps, "label": f"Syncing {dir_name}..."})
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if result.returncode != 0:
-            rsync_errors.append({"dir": dir_name, "error": result.stderr.strip()})
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            if result.returncode != 0:
+                rsync_errors.append({"dir": dir_name, "error": result.stderr.strip()})
+        except subprocess.TimeoutExpired:
+            rsync_errors.append({"dir": dir_name, "error": "rsync timed out after 600s"})
+        except OSError as e:
+            rsync_errors.append({"dir": dir_name, "error": f"rsync could not be started: {e}"})
 
     step += 1
     yield _sse_event({"step": step, "total": total_steps, "label": "Indexing (lsa scan)..."})
@@ -486,8 +562,7 @@ async def plan(req: PlanRequest):
             title=req.title,
             limit=req.limit,
         )
-        _last_intent = intent
-        _last_candidates = candidates
+        _last_intent, _last_candidates = intent, candidates
         result = format_plan_json(intent, candidates, snapshot)
         result["all_candidates"] = [
             {
@@ -511,15 +586,16 @@ async def plan(req: PlanRequest):
 @app.post("/api/plan/mermaid")
 async def plan_mermaid(req: MermaidRequest):
     snapshot = _get_snapshot()
-    if not _last_candidates:
+    candidates = _last_candidates
+    if not candidates:
         raise HTTPException(400, "No plan generated yet. Call /api/plan first.")
     idx = req.candidate_index
-    if idx < 0 or idx >= len(_last_candidates):
+    if idx < 0 or idx >= len(candidates):
         raise HTTPException(
-            400, f"candidate_index {idx} out of range (0..{len(_last_candidates) - 1})"
+            400, f"candidate_index {idx} out of range (0..{len(candidates) - 1})"
         )
     from lsa.output.mermaid import generate_mermaid, to_mermaid_live_url
-    mermaid_code = generate_mermaid(_last_candidates[idx], snapshot)
+    mermaid_code = generate_mermaid(candidates[idx], snapshot)
     return {"mermaid_code": mermaid_code, "live_url": to_mermaid_live_url(mermaid_code)}
 
 
@@ -530,7 +606,7 @@ async def read_file(path: str = Query(...)):
     """Read a file from the snapshot."""
     snapshot = _get_snapshot()
     file_path = (snapshot / path).resolve()
-    if not str(file_path).startswith(str(snapshot.resolve())):
+    if not file_path.is_relative_to(snapshot.resolve()):
         raise HTTPException(403, "Path traversal not allowed")
     if not file_path.exists():
         raise HTTPException(404, f"File not found: {path}")
@@ -716,14 +792,15 @@ def _build_scenario_prompt(
 @app.post("/api/prompt")
 async def generate_prompt(req: PromptRequest):
     snapshot = _get_snapshot()
+    intent, candidates = _last_intent, _last_candidates
 
     if req.scenario:
-        if not _last_candidates:
+        if not candidates:
             raise HTTPException(400, "No plan generated yet.")
         idx = req.candidate_index
-        if idx < 0 or idx >= len(_last_candidates):
+        if idx < 0 or idx >= len(candidates):
             raise HTTPException(400, "candidate_index out of range")
-        candidate = _last_candidates[idx]
+        candidate = candidates[idx]
         scenario = req.scenario if req.scenario in {"incident", "change_request"} else "incident"
         payload = _build_scenario_prompt(
             snapshot,
@@ -746,22 +823,22 @@ async def generate_prompt(req: PromptRequest):
         }
 
     if req.mode == "cursor":
-        if not _last_intent or not _last_candidates:
+        if not intent or not candidates:
             raise HTTPException(400, "No plan generated yet.")
         from lsa.analysis.planner import format_cursor_prompt
-        text = format_cursor_prompt(_last_intent, _last_candidates, snapshot, lang=req.lang)
+        text = format_cursor_prompt(intent, candidates, snapshot, lang=req.lang)
         if req.error_text:
             text += f"\n\n---\n\n## Error from ticket\n\n```\n{req.error_text}\n```\n"
         return {"prompt_text": text, "saved_path": None}
 
     elif req.mode == "deep":
-        if not _last_candidates:
+        if not candidates:
             raise HTTPException(400, "No plan generated yet.")
         idx = req.candidate_index
-        if idx < 0 or idx >= len(_last_candidates):
+        if idx < 0 or idx >= len(candidates):
             raise HTTPException(400, "candidate_index out of range")
         from lsa.output.deep_prompt import generate_deep_prompt
-        candidate = _last_candidates[idx]
+        candidate = candidates[idx]
         text = generate_deep_prompt(candidate, snapshot, lang=req.lang)
         if req.error_text:
             text += f"\n\n---\n\n## Error from ticket\n\n```\n{req.error_text}\n```\n"
@@ -769,10 +846,10 @@ async def generate_prompt(req: PromptRequest):
         prompts_dir = snapshot / ".lsa" / "ai_prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
         parts = []
-        if _last_intent and _last_intent.cid:
-            parts.append(_last_intent.cid)
-        if _last_intent and _last_intent.job_id:
-            parts.append(_last_intent.job_id)
+        if intent and intent.cid:
+            parts.append(intent.cid)
+        if intent and intent.job_id:
+            parts.append(intent.job_id)
         if not parts:
             parts.append(candidate.proc_name)
         parts.append(datetime.now().strftime("%Y%m%d_%H%M%S"))
@@ -886,14 +963,15 @@ _KIND_TO_CODE_DIR: dict[str, str] = {
 async def create_workspace(req: WorkspaceRequest):
     """Create a workspace directory populated with candidate files. Streams SSE progress."""
     snapshot = _get_snapshot()
+    candidates = _last_candidates
 
-    if not _last_candidates:
+    if not candidates:
         raise HTTPException(400, "No plan generated yet. Call /api/plan first.")
 
     idx = req.candidate_index
-    if idx < 0 or idx >= len(_last_candidates):
+    if idx < 0 or idx >= len(candidates):
         raise HTTPException(
-            400, f"candidate_index {idx} out of range (0..{len(_last_candidates) - 1})"
+            400, f"candidate_index {idx} out of range (0..{len(candidates) - 1})"
         )
 
     from lsa.config import load_user_config
@@ -907,14 +985,14 @@ async def create_workspace(req: WorkspaceRequest):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if req.ticket:
-        ws_name = f"{req.ticket}_{timestamp}"
+        ws_name = f"{_sanitize_component(req.ticket)}_{timestamp}"
     elif req.title:
-        ws_name = f"{req.title}_{timestamp}"
+        ws_name = f"{_sanitize_component(req.title)}_{timestamp}"
     else:
         ws_name = f"ws_{timestamp}"
 
     ws_path = workroot / ws_name
-    candidate = _last_candidates[idx]
+    candidate = candidates[idx]
 
     return StreamingResponse(
         _workspace_create_stream(
@@ -1080,11 +1158,12 @@ def _search_kind_clause(kind: str) -> tuple[str, tuple[Any, ...]]:
 
 def _current_scope_paths(snapshot: Path, candidate_index: int) -> set[str]:
     """Return the current candidate's file paths if a plan is available."""
-    if not _last_candidates:
+    candidates = _last_candidates
+    if not candidates:
         return set()
-    if candidate_index < 0 or candidate_index >= len(_last_candidates):
+    if candidate_index < 0 or candidate_index >= len(candidates):
         return set()
-    return {str((snapshot / f.path).resolve().relative_to(snapshot.resolve())) for f in _last_candidates[candidate_index].files}
+    return {str((snapshot / f.path).resolve().relative_to(snapshot.resolve())) for f in candidates[candidate_index].files}
 
 
 def _search_message_codes(conn: sqlite3.Connection, query: str, limit: int) -> list[dict]:
@@ -1313,3 +1392,230 @@ async def stats():
     """Get full snapshot statistics."""
     snapshot = _get_snapshot()
     return _get_snapshot_stats(snapshot)
+
+
+# --- API: Change Docs (CAB / PTF / QA) ---
+
+_ANTHROPIC_KEY_FILE = Path.home() / ".lsa" / "anthropic_key"
+
+
+def _mask_api_key(key: str) -> str:
+    """Return a non-revealing fingerprint of a key for display."""
+    if len(key) <= 12:
+        return "••••"
+    return f"{key[:7]}…{key[-4:]}"
+
+
+def _load_saved_api_key() -> str | None:
+    """Read the persisted Anthropic key from ~/.lsa/anthropic_key, if present."""
+    try:
+        if _ANTHROPIC_KEY_FILE.exists():
+            return _ANTHROPIC_KEY_FILE.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+    return None
+
+
+def _changedocs_key_status() -> dict:
+    """Report whether an Anthropic key is configured and where it comes from."""
+    saved = _load_saved_api_key()
+    if saved:
+        return {"configured": True, "source": "saved", "masked": _mask_api_key(saved)}
+    env_key = os.environ.get("ANTHROPIC_API_KEY")
+    if env_key:
+        return {"configured": True, "source": "env", "masked": _mask_api_key(env_key)}
+    return {"configured": False, "source": None, "masked": None}
+
+
+@app.get("/api/changedocs/key")
+async def changedocs_key_status():
+    """Report Anthropic key status (configured flag, source, masked fingerprint)."""
+    return _changedocs_key_status()
+
+
+@app.post("/api/changedocs/key")
+async def changedocs_key_save(req: ApiKeyRequest):
+    """Persist the Anthropic key to ~/.lsa/anthropic_key with 0600 permissions."""
+    key = (req.api_key or "").strip()
+    if not key:
+        raise HTTPException(400, "API key is empty")
+    if not key.startswith("sk-ant-"):
+        raise HTTPException(400, "Key does not look like an Anthropic key (expected sk-ant-…)")
+    try:
+        _ANTHROPIC_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _ANTHROPIC_KEY_FILE.write_text(key, encoding="utf-8")
+        os.chmod(_ANTHROPIC_KEY_FILE, 0o600)
+    except OSError as e:
+        raise HTTPException(500, f"Could not save key: {e}")
+    return _changedocs_key_status()
+
+
+@app.delete("/api/changedocs/key")
+async def changedocs_key_delete():
+    """Remove the persisted Anthropic key file."""
+    try:
+        _ANTHROPIC_KEY_FILE.unlink(missing_ok=True)
+    except OSError as e:
+        raise HTTPException(500, f"Could not remove key: {e}")
+    return _changedocs_key_status()
+
+
+def _changedocs_remote_overlay(cfg: dict) -> dict | None:
+    """Build a REMOTE override mapping from optional config, else None.
+
+    The ported `change_docs` defaults (ssh alias `rhs`, etc.) remain the
+    guaranteed fallback; an optional `changedocs` mapping in ~/.lsa/config.yaml
+    overlays individual keys, and existing rhs_user is honored as the username
+    when no explicit changedocs username is given.
+    """
+    overlay: dict[str, str] = {}
+    cd = cfg.get("changedocs")
+    if isinstance(cd, dict):
+        for key in ("ssh_alias", "csv", "script", "dest_base", "paths_json", "username"):
+            value = cd.get(key)
+            if value:
+                overlay[key] = value
+    if "username" not in overlay and cfg.get("rhs_user"):
+        overlay["username"] = cfg["rhs_user"]
+    return overlay or None
+
+
+def _changedocs_out_root(cfg: dict) -> Path:
+    """Resolve the server-side output root for generated docs."""
+    snaproot = cfg.get("snaproot")
+    if snaproot:
+        return Path(snaproot).expanduser() / "changedocs"
+    return Path.home() / ".lsa" / "changedocs"
+
+
+def _changedocs_ticket_id(context: dict, override: str | None) -> str:
+    if override:
+        return override
+    desc = context.get("description", "")
+    token = desc.split()[0] if desc else ""
+    return token or context.get("parallel_id", "") or "TICKET"
+
+
+@app.post("/api/changedocs/preview")
+async def changedocs_preview(req: ChangeDocsPreviewRequest):
+    """Dry-run: gather context and estimate cost. No API call, no files written."""
+    from lsa.changedocs import context as ctx, draft as drafter
+    from lsa.config import load_user_config
+
+    cfg = load_user_config()
+    remote = _changedocs_remote_overlay(cfg)
+    try:
+        context = ctx.fetch(req.prid, remote=remote)
+    except ctx.ContextError as e:
+        raise HTTPException(400, str(e))
+
+    if not context["diffs"]:
+        return {
+            "parallel_id": context["parallel_id"],
+            "description": context["description"],
+            "files": context["files"],
+            "diffs": [],
+            "skipped": context["skipped"],
+            "message": "No code diffs found in context. Nothing to draft.",
+            "no_diffs": True,
+        }
+
+    estimate = drafter.dry_run(ctx.to_prompt(context), model=req.model, detail=req.detail,
+                               extra_context=req.extra_context)
+    return {
+        "parallel_id": context["parallel_id"],
+        "description": context["description"],
+        "files": context["files"],
+        "diffs": [{"file": d["file"], "truncated": d["truncated"]} for d in context["diffs"]],
+        "skipped": context["skipped"],
+        "model_id": estimate["model_id"],
+        "estimated_input_tokens": estimate["estimated_input_tokens"],
+        "max_output_tokens": estimate["max_output_tokens"],
+        "estimated_cost_usd": estimate["estimated_cost_usd"],
+        "no_api_call": True,
+    }
+
+
+@app.post("/api/changedocs/generate")
+async def changedocs_generate(req: ChangeDocsGenerateRequest):
+    """Fetch context, draft CAB (always), render selected docs, return downloads."""
+    from lsa.changedocs import context as ctx, draft as drafter, render as renderer
+    from lsa.config import load_user_config
+
+    cfg = load_user_config()
+    remote = _changedocs_remote_overlay(cfg)
+    try:
+        context = ctx.fetch(req.prid, remote=remote)
+    except ctx.ContextError as e:
+        raise HTTPException(400, str(e))
+
+    if not context["diffs"]:
+        raise HTTPException(400, "No code diffs found in context. Nothing to generate.")
+
+    api_key = (req.api_key or "").strip() or _load_saved_api_key() or None
+    try:
+        cab_content = drafter.draft_cab(context, model=req.model, api_key=api_key,
+                                        detail=req.detail, extra_context=req.extra_context)
+    except drafter.DraftError as e:
+        raise HTTPException(400, str(e))
+
+    if req.ticket_id:
+        cab_content["ticket_id"] = req.ticket_id
+    ticket_id = _sanitize_component(
+        _changedocs_ticket_id(context, req.ticket_id or cab_content.get("ticket_id"))
+    )
+
+    out_root = _changedocs_out_root(cfg)
+    out_dir = (out_root / ticket_id).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    produced: list[dict[str, str]] = []
+
+    def _download_ref(name: str) -> str:
+        return f"/api/changedocs/download?ticket_id={ticket_id}&name={name}"
+
+    cab_name = f"{ticket_id}_CAB_Questionnaire.docx"
+    renderer.render_cab(cab_content, str(out_dir / cab_name))
+    produced.append({"kind": "cab", "name": cab_name, "download": _download_ref(cab_name),
+                     "path": str(out_dir / cab_name)})
+
+    if req.ptf:
+        ptf_name = f"{ticket_id}_PTF.docx"
+        renderer.render_ptf(context, str(out_dir / ptf_name), jira=req.jira,
+                            hours=req.hours, live_date=req.live_date)
+        produced.append({"kind": "ptf", "name": ptf_name, "download": _download_ref(ptf_name),
+                         "path": str(out_dir / ptf_name)})
+
+    if req.qa:
+        qa_name = f"{ticket_id}_QA_Checklist.docx"
+        renderer.render_qa(context, str(out_dir / qa_name), job_number=req.qa_job or "",
+                           l_items=req.qa_items or None)
+        produced.append({"kind": "qa", "name": qa_name, "download": _download_ref(qa_name),
+                         "path": str(out_dir / qa_name)})
+
+    return {
+        "ticket_id": ticket_id,
+        "out_dir": str(out_dir),
+        "files": produced,
+        "skipped": context["skipped"],
+    }
+
+
+@app.get("/api/changedocs/download")
+async def changedocs_download(ticket_id: str = Query(...), name: str = Query(...)):
+    """Stream a previously generated .docx; confined to the output directory."""
+    from lsa.config import load_user_config
+
+    cfg = load_user_config()
+    out_root = _changedocs_out_root(cfg).resolve()
+    file_path = (out_root / ticket_id / name).resolve()
+    if not file_path.is_relative_to(out_root):
+        raise HTTPException(403, "Path traversal not allowed")
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, f"File not found: {name}")
+    return FileResponse(
+        str(file_path),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=name,
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )

@@ -225,3 +225,117 @@ def test_app_js_parses_when_node_is_available():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+# --- Path safety: containment checks and name sanitization -------------------
+
+def test_sanitize_component_passes_safe_names():
+    assert server._sanitize_component("TS-12345") == "TS-12345"
+    assert server._sanitize_component("snap_2026.06") == "snap_2026.06"
+
+
+def test_sanitize_component_normalizes_unsafe_chars():
+    assert server._sanitize_component("fix billing/overflow") == "fix_billing_overflow"
+    assert server._sanitize_component("..foo") == "foo"
+
+
+def test_sanitize_component_rejects_empty_and_dot_only():
+    from fastapi import HTTPException
+
+    for bad in ("", "..", ".", "___", ".._.."):
+        with pytest.raises(HTTPException) as exc:
+            server._sanitize_component(bad)
+        assert exc.value.status_code == 400
+
+
+@pytest.mark.anyio
+async def test_read_file_rejects_sibling_prefix_dir(monkeypatch, tmp_path):
+    from fastapi import HTTPException
+
+    snap = tmp_path / "snap"
+    snap.mkdir()
+    evil = tmp_path / "snap-evil"
+    evil.mkdir()
+    (evil / "secret.txt").write_text("secret")
+    monkeypatch.setattr(server, "_get_snapshot", lambda: snap)
+
+    with pytest.raises(HTTPException) as exc:
+        await server.read_file(path="../snap-evil/secret.txt")
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.anyio
+async def test_delete_snapshot_rejects_snaproot_and_siblings(monkeypatch, tmp_path):
+    from fastapi import HTTPException
+
+    root = tmp_path / "snaps"
+    root.mkdir()
+    sibling = tmp_path / "snaps-evil"
+    sibling.mkdir()
+    monkeypatch.setattr(server, "_snaproot", root)
+
+    with pytest.raises(HTTPException) as exc_root:
+        await server.delete_snapshot(path=str(root))
+    assert exc_root.value.status_code == 403
+
+    with pytest.raises(HTTPException) as exc_sibling:
+        await server.delete_snapshot(path=str(sibling))
+    assert exc_sibling.value.status_code == 403
+    assert sibling.exists()
+
+    inside = root / "snapshot_x"
+    inside.mkdir()
+    resp = await server.delete_snapshot(path=str(inside))
+    assert resp["status"] == "deleted"
+    assert not inside.exists()
+
+
+@pytest.mark.anyio
+async def test_create_snapshot_rejects_unsafe_name(monkeypatch, tmp_path):
+    from fastapi import HTTPException
+
+    monkeypatch.setattr(
+        "lsa.config.load_user_config",
+        lambda: {"rhs_host": "prod", "snaproot": str(tmp_path)},
+    )
+    req = server.NewSnapshotRequest(name="../evil")
+    with pytest.raises(HTTPException) as exc:
+        await server.create_snapshot(req)
+    assert exc.value.status_code == 400
+    assert not (tmp_path.parent / "rhs_snapshot_evil").exists()
+
+
+# --- medium-fixes-v1: origin guard and SSE stream resilience ------------------
+
+def test_origin_allowed_accepts_local_and_absent():
+    assert server._origin_allowed(None) is True
+    assert server._origin_allowed("") is True
+    assert server._origin_allowed("http://localhost:8000") is True
+    assert server._origin_allowed("http://127.0.0.1:9999") is True
+
+
+def test_origin_allowed_rejects_foreign_and_opaque():
+    assert server._origin_allowed("https://evil.example.com") is False
+    assert server._origin_allowed("http://192.168.1.5:8000") is False
+    assert server._origin_allowed("null") is False
+
+
+def test_snapshot_stream_survives_rsync_timeout(monkeypatch, tmp_path):
+    import json as _json
+
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=args[0], timeout=600)
+
+    monkeypatch.setattr(server.subprocess, "run", _timeout)
+    req = server.NewSnapshotRequest(name="t1")
+    snap_dir = tmp_path / "rhs_snapshot_t1"
+    events = [
+        _json.loads(e[len("data: "):])
+        for e in server._snapshot_create_stream(req, snap_dir, {"rhs_host": "prod"})
+    ]
+
+    final = events[-1]
+    assert final["done"] is True
+    assert len(final["rsync_errors"]) == 5
+    assert all("timed out" in e["error"] for e in final["rsync_errors"])
+    assert final["scan_ok"] is False

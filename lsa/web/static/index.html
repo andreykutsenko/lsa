@@ -42,6 +42,7 @@
         <div class="step active" data-step="snapshot">Snapshot</div>
         <div class="step" data-step="bundle">Bundle</div>
         <div class="step" data-step="prompt">Prompt</div>
+        <div class="step" data-step="changedocs">Change Docs</div>
       </div>
       <div class="nav-section">
         <div class="nav-section-title">Inspect</div>
@@ -64,7 +65,10 @@
     <div class="modal-content">
       <div class="modal-header">
         <span class="modal-title" id="modal-title"></span>
-        <button class="modal-close" id="modal-close">&times;</button>
+        <div class="modal-header-actions">
+          <button class="btn btn--sm" id="modal-copy" hidden>Copy raw</button>
+          <button class="modal-close" id="modal-close">&times;</button>
+        </div>
       </div>
       <div class="modal-body" id="modal-body"></div>
     </div>
