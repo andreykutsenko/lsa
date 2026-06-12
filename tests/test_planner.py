@@ -242,7 +242,7 @@ class TestDfaFromProcsTokens:
                 conn,
                 snapshot_path=tmp_path,
                 cid="WCCU",
-                title="WCCU Letter 14",
+                title="WCCU Letter 14 - Monthly Update Notice",
             )
 
             assert len(candidates) >= 1
@@ -275,7 +275,7 @@ class TestTitlePhraseMatchRanking:
                 conn,
                 snapshot_path=tmp_path,
                 cid="WCCU",
-                title="WCCU Letter 14",
+                title="WCCU Letter 14 - Monthly Update Notice",
             )
 
             assert len(candidates) >= 2
@@ -334,7 +334,7 @@ class TestDfaLetterFiltering:
 
             intent, candidates = generate_plan(
                 conn, snapshot_path=tmp_path, cid="WCCU",
-                title="WCCU Letter 14",
+                title="WCCU Letter 14 - Monthly Update Notice",
             )
 
             top = candidates[0]
